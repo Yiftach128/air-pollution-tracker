@@ -2,7 +2,7 @@ package com.pollution.common.pubsub.kafka;
 
 import com.pollution.common.PollutionLogger;
 import com.pollution.common.config.Config;
-import com.pollution.common.pubsub.Subscriber;
+import com.pollution.common.pubsub.ISubscriber;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -16,7 +16,7 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 
-public class KafkaSubscriber<T> implements Subscriber<T> {
+public class KafkaSubscriber<T> implements ISubscriber<T> {
 
     private static final Logger logger = PollutionLogger.getLogger(KafkaSubscriber.class);
     private static final Duration POLL_TIMEOUT = Duration.ofMillis(500);

@@ -1,6 +1,6 @@
 package com.pollution.common.pubsub;
 
-public interface Producer<T> extends AutoCloseable {
+public interface IPublisher<T> extends AutoCloseable {
 
     void send(T message, String key);
 

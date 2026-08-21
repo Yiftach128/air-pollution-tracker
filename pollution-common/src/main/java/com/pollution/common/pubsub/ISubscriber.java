@@ -2,7 +2,7 @@ package com.pollution.common.pubsub;
 
 import java.util.function.Consumer;
 
-public interface Subscriber<T> extends AutoCloseable {
+public interface ISubscriber<T> extends AutoCloseable {
 
     void subscribe(Consumer<T> messageHandler);
 

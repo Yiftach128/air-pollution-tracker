@@ -2,8 +2,8 @@ package com.pollution.datacollector.config;
 
 import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
 
-import com.pollution.common.pubsub.Producer;
-import com.pollution.common.pubsub.kafka.KafkaProducer;
+import com.pollution.common.pubsub.IPublisher;
+import com.pollution.common.pubsub.kafka.KafkaPublisher;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -26,8 +26,8 @@ public final class Config {
         return DEFAULT_PUBLISH_INTERVAL_MS;
     }
 
-    public static Producer<String> createPollutionProducer() {
-        return new KafkaProducer<>(POLLUTION_DATA_TOPIC, new StringSerializer());
+    public static IPublisher<String> createPollutionPublisher() {
+        return new KafkaPublisher<>(POLLUTION_DATA_TOPIC, new StringSerializer());
     }
 
     public static ScheduledExecutorService createScheduler() {

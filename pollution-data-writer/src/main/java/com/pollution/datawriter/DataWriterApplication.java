@@ -1,7 +1,7 @@
 package com.pollution.datawriter;
 
 import com.pollution.common.PollutionLogger;
-import com.pollution.common.pubsub.Subscriber;
+import com.pollution.common.pubsub.ISubscriber;
 import com.pollution.datawriter.config.Config;
 import org.slf4j.Logger;
 
@@ -11,7 +11,7 @@ public class DataWriterApplication {
 
     public static void main(String[] args) {
         logger.info("{} starting", Config.SERVICE_NAME);
-        Subscriber<String> pollutionSubscriber = Config.createPollutionSubscriber();
+        ISubscriber<String> pollutionSubscriber = Config.createPollutionSubscriber();
         Runtime.getRuntime().addShutdownHook(
                 new Thread(pollutionSubscriber::close, "subscriber-shutdown"));
         pollutionSubscriber.subscribe(DataWriterApplication::handleMessage);
