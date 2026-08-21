@@ -1,4 +1,4 @@
-package com.pollution.common.message;
+package com.pollution.common.entities;
 
 /**
  * Pollutants tracked by the system, with the unit their concentration is reported in.

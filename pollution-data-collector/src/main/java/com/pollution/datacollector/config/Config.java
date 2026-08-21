@@ -1,36 +1,66 @@
 package com.pollution.datacollector.config;
 
-import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
+import com.pollution.common.config.Env;
+import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
+import java.net.URI;
+import java.time.Duration;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 
-import com.pollution.common.pubsub.IPublisher;
-import com.pollution.common.pubsub.kafka.KafkaPublisher;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import org.apache.kafka.common.serialization.StringSerializer;
-
+/**
+ * The collector's settings. Values only; see {@link Wiring} for how the
+ * service is assembled from them.
+ */
 public final class Config {
 
     public static final String SERVICE_NAME = "pollution-data-collector";
 
-    private static final int SCHEDULER_POOL_SIZE = 2;
-    private static final long DEFAULT_PUBLISH_INTERVAL_MS = 5000;
+    public static final URI PURPLEAIR_BASE_URI = URI.create("https://api.purpleair.com/");
+    public static final Duration PURPLEAIR_CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration PURPLEAIR_REQUEST_TIMEOUT = Duration.ofSeconds(15);
+
+    /** Thread names of the two collector loops, as they appear in logs. */
+    public static final String POLL_THREAD_NAME = "purpleair-poll";
+    public static final String PUBLISH_THREAD_NAME = "kafka-publish";
+
+    /**
+     * PurpleAir read keys, used round-robin so API points are spread across them.
+     * Overridden by the {@code PURPLEAIR_API_KEYS} env var (comma-separated) when set.
+     */
+    private static final List<String> DEFAULT_PURPLEAIR_API_KEYS = List.of(
+            // "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+    );
+
+    /** How often PurpleAir is asked for fresh readings; each poll costs API points per sensor. */
+    private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofMinutes(5);
+    /** How often the last reading of every sensor is (re)published. */
+    private static final Duration DEFAULT_PUBLISH_INTERVAL = Duration.ofSeconds(10);
+    /** A reading not refreshed for this long stops being republished; default is two missed polls. */
+    private static final int DEFAULT_READING_MAX_AGE_IN_POLLS = 2;
 
     private Config() {
     }
 
-    public static long getPublishIntervalMillis() {
-        String env = System.getenv("PUBLISH_INTERVAL_MS");
-        if (env != null) {
-            return Long.parseLong(env);
-        }
-        return DEFAULT_PUBLISH_INTERVAL_MS;
+    public static Duration getPollInterval() {
+        return Duration.ofMillis(Env.getLong("POLL_INTERVAL_MS", DEFAULT_POLL_INTERVAL.toMillis()));
     }
 
-    public static IPublisher<String> createPollutionPublisher() {
-        return new KafkaPublisher<>(POLLUTION_DATA_TOPIC, new StringSerializer());
+    public static Duration getPublishInterval() {
+        return Duration.ofMillis(Env.getLong("PUBLISH_INTERVAL_MS", DEFAULT_PUBLISH_INTERVAL.toMillis()));
     }
 
-    public static ScheduledExecutorService createScheduler() {
-        return Executors.newScheduledThreadPool(SCHEDULER_POOL_SIZE);
+    public static Duration getReadingMaxAge() {
+        Duration defaultMaxAge = getPollInterval().multipliedBy(DEFAULT_READING_MAX_AGE_IN_POLLS);
+        return Duration.ofMillis(Env.getLong("READING_MAX_AGE_MS", defaultMaxAge.toMillis()));
+    }
+
+    public static List<String> getPurpleAirApiKeys() {
+        return Env.getList("PURPLEAIR_API_KEYS", DEFAULT_PURPLEAIR_API_KEYS);
+    }
+
+    /** The sensors to poll: every entry of {@link PurpleAirSensor}. */
+    public static Set<PurpleAirSensor> getSensors() {
+        return EnumSet.allOf(PurpleAirSensor.class);
     }
 }

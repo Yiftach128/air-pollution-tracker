@@ -1,4 +1,4 @@
-package com.pollution.common.message;
+package com.pollution.common.entities;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -20,6 +20,11 @@ public record PollutionData(String city, String source, Pollutant pollutant, dou
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(pollutant, "pollutant");
         Objects.requireNonNull(timestamp, "timestamp");
+    }
+
+    /** A copy of this reading carrying a different timestamp. */
+    public PollutionData withTimestamp(Instant newTimestamp) {
+        return new PollutionData(city, source, pollutant, value, newTimestamp);
     }
 
     @Override

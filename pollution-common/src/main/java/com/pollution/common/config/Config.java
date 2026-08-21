@@ -11,19 +11,11 @@ public final class Config {
     }
 
     public static String getKafkaHost() {
-        String env = System.getenv("KAFKA_HOST");
-        if (env != null) {
-            return env;
-        }
-        return DEFAULT_KAFKA_HOST;
+        return Env.getString("KAFKA_HOST", DEFAULT_KAFKA_HOST);
     }
 
     public static int getKafkaPort() {
-        String env = System.getenv("KAFKA_PORT");
-        if (env != null) {
-            return Integer.parseInt(env);
-        }
-        return DEFAULT_KAFKA_PORT;
+        return Env.getInt("KAFKA_PORT", DEFAULT_KAFKA_PORT);
     }
 
     public static String getKafkaBootstrapServers() {

@@ -65,6 +65,12 @@ public class KafkaSubscriber<T> implements ISubscriber<T> {
     }
 
     private void handle(Consumer<T> messageHandler, ConsumerRecord<String, T> record) {
+        if (record.value() == null) {
+            // tombstone, or a record the deserializer rejected and already logged
+            logger.debug("skipping null-valued record with key {} at {}-{} offset {}",
+                    record.key(), record.topic(), record.partition(), record.offset());
+            return;
+        }
         try {
             messageHandler.accept(record.value());
         } catch (RuntimeException e) {

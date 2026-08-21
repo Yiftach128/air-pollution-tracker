@@ -2,3 +2,6 @@ target/
 logs/
 *.iml
 .idea/
+
+# local PurpleAir API response dumps
+data-example.json

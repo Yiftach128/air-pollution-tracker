@@ -1,4 +1,4 @@
-package com.pollution.common.message;
+package com.pollution.common.entities;
 
 import java.time.Instant;
 

@@ -1,8 +1,11 @@
 package com.pollution.datacollector;
 
 import com.pollution.common.PollutionLogger;
+import com.pollution.common.entities.PollutionData;
 import com.pollution.common.pubsub.IPublisher;
 import com.pollution.datacollector.config.Config;
+import com.pollution.datacollector.config.Wiring;
+import com.pollution.datacollector.fetchers.IReadingsFetcher;
 import org.slf4j.Logger;
 
 public class DataCollectorApplication {
@@ -11,9 +14,9 @@ public class DataCollectorApplication {
 
     public static void main(String[] args) {
         logger.info("{} starting", Config.SERVICE_NAME);
-        IPublisher<String> pollutionPublisher = Config.createPollutionPublisher();
-        PollutionDataCollectorService service =
-                new PollutionDataCollectorService(pollutionPublisher, Config.createScheduler());
+        IReadingsFetcher readingsFetcher = Wiring.createReadingsFetcher();
+        IPublisher<PollutionData> pollutionPublisher = Wiring.createPollutionPublisher();
+        PollutionDataCollectorService service = Wiring.createCollectorService(readingsFetcher, pollutionPublisher);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             service.close();
             pollutionPublisher.close();
