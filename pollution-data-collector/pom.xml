@@ -10,24 +10,17 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>pollution-common</artifactId>
+    <artifactId>pollution-data-collector</artifactId>
     <packaging>jar</packaging>
 
-    <name>pollution-common</name>
-    <description>Shared utilities for the polluted-air microservices</description>
+    <name>pollution-data-collector</name>
+    <description>Service that collects pollution data and publishes it</description>
 
     <dependencies>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
+            <groupId>com.pollution</groupId>
+            <artifactId>pollution-common</artifactId>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 </project>
