@@ -10,11 +10,11 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>pollution-data-analyzer</artifactId>
+    <artifactId>persistence-common</artifactId>
     <packaging>jar</packaging>
 
-    <name>pollution-data-analyzer</name>
-    <description>Service that analyzes pollution data</description>
+    <name>persistence-common</name>
+    <description>Shared cache abstraction and its Redis implementation for the polluted-air microservices</description>
 
     <dependencies>
         <dependency>
@@ -23,9 +23,8 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.pollution</groupId>
-            <artifactId>persistence-common</artifactId>
-            <version>${project.version}</version>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
         </dependency>
     </dependencies>
 </project>

@@ -3,6 +3,7 @@ package com.pollution.common.config;
 public final class Config {
 
     public static final String POLLUTION_DATA_TOPIC = "pollution-data";
+    public static final String POLLUTION_AVERAGE_TOPIC = "pollution-average";
 
     private static final String DEFAULT_KAFKA_HOST = "localhost";
     private static final int DEFAULT_KAFKA_PORT = 9092;

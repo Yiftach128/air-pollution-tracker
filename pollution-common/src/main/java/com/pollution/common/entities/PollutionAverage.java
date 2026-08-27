@@ -1,53 +1,50 @@
 package com.pollution.common.entities;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * The average concentration of a pollutant at a source over a time window.
+ * The rolling averages of a pollutant at a source, one per window length
+ * (e.g. the last 10 minutes, hour and day), all ending at the same instant.
  * <p>
- * Its {@link #timestamp()} is the end of the window, i.e. the instant the
- * average became known.
+ * Its {@link #timestamp()} is the end of every window: the newest reading the
+ * averages include, i.e. the instant they became known.
  */
 public final class PollutionAverage extends AbstractMessage {
 
     private final String source;
     private final Pollutant pollutant;
-    private final double averageValue;
-    private final int sampleCount;
-    private final Instant windowStart;
-    private final Instant windowEnd;
+    private final List<WindowAverage> averages;
 
     /**
-     * @param city         the city the source is located in
-     * @param source       identifier of the sensor/station the readings came from
-     * @param pollutant    the pollutant averaged
-     * @param averageValue mean concentration over the window, in {@link Pollutant#unit()}
-     * @param sampleCount  number of readings the average was computed from
-     * @param windowStart  start of the averaging window (inclusive)
-     * @param windowEnd    end of the averaging window (exclusive); becomes the message's {@link #timestamp()}
+     * @param city      the city the source is located in
+     * @param source    identifier of the sensor/station the readings came from
+     * @param pollutant the pollutant averaged
+     * @param averages  one average per window, no two over the same window; not empty
+     * @param timestamp end of every window: the newest reading the averages include
      */
     public PollutionAverage(String city,
                             String source,
                             Pollutant pollutant,
-                            double averageValue,
-                            int sampleCount,
-                            Instant windowStart,
-                            Instant windowEnd) {
-        super(city, windowEnd);
+                            List<WindowAverage> averages,
+                            Instant timestamp) {
+        super(city, timestamp);
         this.source = Objects.requireNonNull(source, "source");
         this.pollutant = Objects.requireNonNull(pollutant, "pollutant");
-        this.windowStart = Objects.requireNonNull(windowStart, "windowStart");
-        this.windowEnd = windowEnd;
-        if (sampleCount <= 0) {
-            throw new IllegalArgumentException("sampleCount must be positive, was " + sampleCount);
+        this.averages = List.copyOf(Objects.requireNonNull(averages, "averages"));
+        if (this.averages.isEmpty()) {
+            throw new IllegalArgumentException("averages must not be empty");
         }
-        if (windowEnd.isBefore(windowStart)) {
-            throw new IllegalArgumentException(
-                    "windowEnd " + windowEnd + " is before windowStart " + windowStart);
+        Set<Duration> windows = new HashSet<>();
+        for (WindowAverage average : this.averages) {
+            if (!windows.add(average.window())) {
+                throw new IllegalArgumentException("duplicate window " + average.window());
+            }
         }
-        this.averageValue = averageValue;
-        this.sampleCount = sampleCount;
     }
 
     /** Identifier of the sensor/station the readings came from. */
@@ -60,24 +57,9 @@ public final class PollutionAverage extends AbstractMessage {
         return pollutant;
     }
 
-    /** Mean concentration over the window, in {@link Pollutant#unit()}. */
-    public double averageValue() {
-        return averageValue;
-    }
-
-    /** Number of readings the average was computed from. */
-    public int sampleCount() {
-        return sampleCount;
-    }
-
-    /** Start of the averaging window (inclusive). */
-    public Instant windowStart() {
-        return windowStart;
-    }
-
-    /** End of the averaging window (exclusive); the same instant as {@link #timestamp()}. */
-    public Instant windowEnd() {
-        return windowEnd;
+    /** One average per window, in the order they were given; never empty. */
+    public List<WindowAverage> averages() {
+        return averages;
     }
 
     @Override
@@ -91,22 +73,24 @@ public final class PollutionAverage extends AbstractMessage {
         return city().equals(that.city())
                 && source.equals(that.source)
                 && pollutant == that.pollutant
-                && Double.compare(averageValue, that.averageValue) == 0
-                && sampleCount == that.sampleCount
-                && windowStart.equals(that.windowStart)
+                && averages.equals(that.averages)
                 && timestamp().equals(that.timestamp());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(city(), source, pollutant, averageValue, sampleCount, windowStart, timestamp());
+        return Objects.hash(city(), source, pollutant, averages, timestamp());
     }
 
     @Override
     public String toString() {
-        return "PollutionAverage{city=" + city() + ", source=" + source
-                + ", " + pollutant.displayName() + "=" + averageValue + " " + pollutant.unit()
-                + ", samples=" + sampleCount
-                + ", window=" + windowStart + ".." + windowEnd() + "}";
+        StringBuilder text = new StringBuilder("PollutionAverage{city=").append(city())
+                .append(", source=").append(source)
+                .append(", ").append(pollutant.displayName()).append(" in ").append(pollutant.unit());
+        for (WindowAverage average : averages) {
+            text.append(", ").append(average.window()).append('=').append(average.averageValue())
+                    .append(" (").append(average.sampleCount()).append(" samples)");
+        }
+        return text.append(", at=").append(timestamp()).append('}').toString();
     }
 }

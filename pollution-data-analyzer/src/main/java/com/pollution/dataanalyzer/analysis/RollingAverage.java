@@ -2,7 +2,8 @@ package com.pollution.dataanalyzer.analysis;
 
 import com.pollution.common.PollutionLogger;
 import com.pollution.dataanalyzer.entities.Reading;
-import com.pollution.dataanalyzer.entities.RollingAverageSnapshot;
+import com.pollution.dataanalyzer.entities.RollingAverageState;
+import com.pollution.dataanalyzer.entities.SensorPollutant;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -13,7 +14,7 @@ import java.util.OptionalDouble;
 import org.slf4j.Logger;
 
 /**
- * A time-windowed rolling average of one sensor's readings.
+ * A time-windowed rolling average of one series' readings.
  * <p>
  * Readings are appended in arrival order; every {@link #addReading} evicts
  * readings older than {@code window}, measured back from the newest timestamp
@@ -36,7 +37,7 @@ public class RollingAverage {
 
     private static final Logger logger = PollutionLogger.getLogger(RollingAverage.class);
 
-    private final String sensorId;
+    private final SensorPollutant sensorPollutant;
     private final Duration window;
     private final Deque<Reading> buffer = new ArrayDeque<>();
     private double sum;
@@ -44,11 +45,11 @@ public class RollingAverage {
     private Instant latest;
 
     /**
-     * @param sensorId identifier of the sensor whose readings are averaged
-     * @param window   how far back from the newest reading the window reaches; must be positive
+     * @param sensorPollutant the series whose readings are averaged
+     * @param window          how far back from the newest reading the window reaches; must be positive
      */
-    public RollingAverage(String sensorId, Duration window) {
-        this.sensorId = Objects.requireNonNull(sensorId, "sensorId");
+    public RollingAverage(SensorPollutant sensorPollutant, Duration window) {
+        this.sensorPollutant = Objects.requireNonNull(sensorPollutant, "sensorPollutant");
         this.window = Objects.requireNonNull(window, "window");
         if (window.isZero() || window.isNegative()) {
             throw new IllegalArgumentException("window must be positive, was " + window);
@@ -56,29 +57,35 @@ public class RollingAverage {
     }
 
     /**
-     * Rebuilds a rolling average from a persisted snapshot.
+     * Rebuilds a rolling average from a persisted state.
      * <p>
-     * The configured window wins over the persisted one: the snapshot's
-     * readings are replayed in order and any that fall outside
+     * The configured window wins over the persisted one: the state's readings
+     * are replayed in order and any that fall outside
      * {@code latest - configuredWindow} are dropped, so the restored buffer and
-     * sum are exactly what this window would have kept.
+     * sum are exactly what this window would have kept. This is how a shorter
+     * window is derived from the persisted longest one; a window
+     * <em>longer</em> than the persisted one starts short of readings and
+     * only fills up as new ones arrive.
      *
-     * @param snapshot         state saved by {@link #getSnapshot()}
+     * @param state            state saved by {@link #getState()}
      * @param configuredWindow the window the restored instance should use
      */
-    public static RollingAverage loadFromPersistence(RollingAverageSnapshot snapshot, Duration configuredWindow) {
-        Objects.requireNonNull(snapshot, "snapshot");
-        RollingAverage restored = new RollingAverage(snapshot.sensorId(), configuredWindow);
-        if (!configuredWindow.equals(snapshot.window())) {
-            logger.warn("sensor {}: persisted window {} differs from configured {}; readings outside the configured window are dropped",
-                    snapshot.sensorId(), snapshot.window(), configuredWindow);
+    public static RollingAverage loadFromPersistence(RollingAverageState state, Duration configuredWindow) {
+        Objects.requireNonNull(state, "state");
+        RollingAverage restored = new RollingAverage(state.sensorPollutant(), configuredWindow);
+        int comparison = configuredWindow.compareTo(state.window());
+        if (comparison < 0) {
+            logger.debug("{}: deriving {} window from persisted {} window", state.sensorPollutant(), configuredWindow, state.window());
+        } else if (comparison > 0) {
+            logger.warn("{}: configured window {} is longer than persisted {}; it holds only the persisted readings until it refills",
+                    state.sensorPollutant(), configuredWindow, state.window());
         }
-        restored.latest = snapshot.latest();
-        for (Reading reading : snapshot.readings()) {
+        restored.latest = state.latest();
+        for (Reading reading : state.readings()) {
             restored.addReading(reading.timestamp(), reading.value());
         }
-        logger.info("sensor {}: restored {} of {} readings, latest {}",
-                snapshot.sensorId(), restored.size(), snapshot.sampleCount(), restored.latest);
+        logger.debug("{}: {} window restored {} of {} readings, latest {}",
+                state.sensorPollutant(), configuredWindow, restored.size(), state.sampleCount(), restored.latest);
         return restored;
     }
 
@@ -87,16 +94,18 @@ public class RollingAverage {
      * out of it, i.e. is older than {@code latest - window} where {@code latest}
      * is the newest timestamp seen so far. A reading that is itself already
      * older than that cutoff is ignored.
+     *
+     * @return whether the reading was accepted, i.e. whether the state changed
      */
-    public void addReading(Instant timestamp, double value) {
+    public boolean addReading(Instant timestamp, double value) {
         Objects.requireNonNull(timestamp, "timestamp");
         if (latest == null || timestamp.isAfter(latest)) {
             latest = timestamp;
         }
         Instant cutoff = latest.minus(window);
         if (timestamp.isBefore(cutoff)) {
-            logger.debug("sensor {}: dropping late reading at {}, window starts at {}", sensorId, timestamp, cutoff);
-            return;
+            logger.debug("{}: {} window dropping late reading at {}, window starts at {}", sensorPollutant, window, timestamp, cutoff);
+            return false;
         }
 
         buffer.add(new Reading(timestamp, value));
@@ -104,6 +113,7 @@ public class RollingAverage {
         while (buffer.peek().timestamp().isBefore(cutoff)) {
             sum -= buffer.poll().value();
         }
+        return true;
     }
 
     /**
@@ -119,21 +129,26 @@ public class RollingAverage {
 
     /**
      * The complete current state, sufficient to rebuild this instance with
-     * {@link #loadFromPersistence}. The returned snapshot is immutable and
+     * {@link #loadFromPersistence}. The returned state is immutable and
      * does not change when this average does.
      */
-    public RollingAverageSnapshot getSnapshot() {
-        return new RollingAverageSnapshot(sensorId, window, sum, latest, List.copyOf(buffer));
+    public RollingAverageState getState() {
+        return new RollingAverageState(sensorPollutant, window, sum, latest, List.copyOf(buffer));
     }
 
-    /** Identifier of the sensor whose readings are averaged. */
-    public String sensorId() {
-        return sensorId;
+    /** The series whose readings are averaged. */
+    public SensorPollutant sensorPollutant() {
+        return sensorPollutant;
     }
 
     /** How far back from the newest reading the window reaches. */
     public Duration window() {
         return window;
+    }
+
+    /** Newest timestamp seen so far, or {@code null} if no reading has been accepted yet. */
+    public Instant latest() {
+        return latest;
     }
 
     /** Number of readings currently in the window. */

@@ -1,7 +1,9 @@
 package com.pollution.datawriter.config;
 
+import static com.pollution.common.config.Config.POLLUTION_AVERAGE_TOPIC;
 import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
 
+import com.pollution.common.entities.PollutionAverage;
 import com.pollution.common.entities.PollutionData;
 import com.pollution.common.pubsub.ISubscriber;
 import com.pollution.common.pubsub.kafka.JsonDeserializer;
@@ -19,5 +21,9 @@ public final class Wiring {
 
     public static ISubscriber<PollutionData> createPollutionSubscriber() {
         return new KafkaSubscriber<>(POLLUTION_DATA_TOPIC, Config.SERVICE_NAME, new JsonDeserializer<>(PollutionData.class));
+    }
+
+    public static ISubscriber<PollutionAverage> createAverageSubscriber() {
+        return new KafkaSubscriber<>(POLLUTION_AVERAGE_TOPIC, Config.SERVICE_NAME, new JsonDeserializer<>(PollutionAverage.class));
     }
 }
