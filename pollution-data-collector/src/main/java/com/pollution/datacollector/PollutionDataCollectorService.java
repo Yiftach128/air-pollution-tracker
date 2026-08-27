@@ -136,13 +136,11 @@ public class PollutionDataCollectorService implements AutoCloseable {
             pollutionPublisher.send(message, message.source());
             // a concurrent poll may have replaced the entry; then its fresh copy starts from 0 as it should
             latestReadings.replace(entry.getKey(), cached, cached.published());
-            logger.debug("published {}", message);
+            logger.info("published {}", message);
             published++;
         }
         if (published == 0) {
             logger.warn("nothing to publish");
-        } else {
-            logger.info("published {} readings", published);
         }
     }
 

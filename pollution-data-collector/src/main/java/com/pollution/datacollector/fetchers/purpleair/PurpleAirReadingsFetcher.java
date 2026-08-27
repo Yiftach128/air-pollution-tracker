@@ -23,10 +23,15 @@ import org.slf4j.Logger;
  * which supplies the reading's {@code source} name. A sensor that could not be
  * enriched still produces readings (named after its enum constant) and is
  * retried on the next cycle.
+ * <p>
+ * Every {@code source} is prefixed with {@value #SOURCE_PREFIX} so readings from
+ * different providers can never collide on name.
  */
 public class PurpleAirReadingsFetcher implements IReadingsFetcher {
 
     private static final Logger logger = PollutionLogger.getLogger(PurpleAirReadingsFetcher.class);
+    /** Namespaces PurpleAir sources in {@link PollutionData#source()}. */
+    static final String SOURCE_PREFIX = "purpleair:";
 
     private final PurpleAirSensorApi sensorApi;
     private final ISensorRegistry<PurpleAirSensor, PurpleAirSensorInfo> sensorRegistry;
@@ -60,12 +65,13 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
         return readings;
     }
 
-    /** The sensor's PurpleAir name, enriching it now if startup enrichment failed. */
+    /** {@value #SOURCE_PREFIX} + the sensor's PurpleAir name, enriching it now if startup enrichment failed. */
     private String sourceName(PurpleAirSensor sensor) {
-        return sensorRegistry.get(sensor)
+        String name = sensorRegistry.get(sensor)
                 .or(() -> retryEnrichment(sensor))
                 .map(PurpleAirSensorInfo::name)
                 .orElse(sensor.name());
+        return SOURCE_PREFIX + name;
     }
 
     private Optional<PurpleAirSensorInfo> retryEnrichment(PurpleAirSensor sensor) {

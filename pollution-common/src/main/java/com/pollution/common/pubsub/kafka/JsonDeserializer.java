@@ -1,7 +1,8 @@
 package com.pollution.common.pubsub.kafka;
 
 import com.pollution.common.PollutionLogger;
-import java.io.IOException;
+import com.pollution.common.json.JsonException;
+import com.pollution.common.json.JsonSupport;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.slf4j.Logger;
 
@@ -28,8 +29,8 @@ public class JsonDeserializer<T> implements Deserializer<T> {
             return null;
         }
         try {
-            return JsonSupport.MAPPER.readValue(data, type);
-        } catch (IOException e) {
+            return JsonSupport.fromJson(data, type);
+        } catch (JsonException e) {
             logger.error("dropping undeserializable {} record from topic {}", type.getSimpleName(), topic, e);
             return null;
         }

@@ -16,6 +16,7 @@
         <module>pollution-common</module>
         <module>pollution-data-collector</module>
         <module>pollution-data-writer</module>
+        <module>pollution-data-analyzer</module>
     </modules>
 
     <properties>
@@ -55,6 +56,28 @@
                 <artifactId>jackson-datatype-jsr310</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.module</groupId>
+                <artifactId>jackson-module-parameter-names</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <!-- keep constructor parameter names in class files: JSON deserialization
+                             of the immutable messages in pollution-common relies on them -->
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

@@ -29,7 +29,7 @@ public final class Config {
      * Overridden by the {@code PURPLEAIR_API_KEYS} env var (comma-separated) when set.
      */
     private static final List<String> DEFAULT_PURPLEAIR_API_KEYS = List.of(
-            // "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+            "DCCF8399-9D98-11F1-9E30-4201AC1DC129"
     );
 
     /** How often PurpleAir is asked for fresh readings; each poll costs API points per sensor. */

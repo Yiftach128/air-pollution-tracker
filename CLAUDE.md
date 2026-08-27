@@ -7,6 +7,7 @@ Java 17 multi-module Maven project: air pollution microservices.
 - `pollution-common` — shared utilities; every service depends on it.
 - `pollution-data-collector` — service that collects pollution data and publishes it.
 - `pollution-data-writer` — service that writes pollution data.
+- `pollution-data-analyzer` — service that analyzes pollution data.
 
 ## Configuration rules
 
@@ -23,7 +24,7 @@ Java 17 multi-module Maven project: air pollution microservices.
 
 ## Package layout rules
 
-- Entities — the data types the system is about (messages, readings, sensors, enums of domain values) — live in an `entities` package: `com.pollution.common.entities` for types shared across services (`IMessage`, `Pollutant`, `PollutionData`, `PollutionAverage`, `PollutionAlert`) and `com.pollution.<service>.entities` for service-specific ones. Entities are immutable value types (records/enums) with no I/O and no dependencies on APIs, Kafka, or config.
+- Entities — the data types the system is about (messages, readings, sensors, enums of domain values) — live in an `entities` package: `com.pollution.common.entities` for types shared across services (`AbstractMessage`, `Pollutant`, `PollutionData`, `PollutionAverage`, `PollutionAlert`) and `com.pollution.<service>.entities` for service-specific ones. Entities are immutable value types (records/enums, or final classes with final fields and value `equals`/`hashCode`) with no I/O and no dependencies on APIs, Kafka, or config — no Jackson annotations either. Messages extend the abstract class `AbstractMessage` (which holds `city` and `timestamp`) and expose exactly one public constructor whose parameter names match the field names: that is how `JsonSupport` in `pollution-common` rebuilds them from JSON (the build keeps parameter names via `javac -parameters`).
 - Services are organized **by layer, then by provider**. Each layer is a top-level package holding only provider-agnostic types (interfaces, shared helpers); everything specific to a data provider goes in a sub-package named after it (`<layer>/purpleair`). The collector's layers:
   - `entities/` — `entities/purpleair/` holds `PurpleAirSensor`, `PurpleAirReading`, `PurpleAirSensorInfo`.
   - `api/` — access to external APIs: `IApiKeyProvider`, `RoundRobinApiKeyProvider`; `api/purpleair/` holds `PurpleAirSensorApi`, `PurpleAirApiException`.
@@ -31,6 +32,13 @@ Java 17 multi-module Maven project: air pollution microservices.
   - `fetchers/` — turning provider data into `PollutionData`: `IReadingsFetcher`; `fetchers/purpleair/` holds `PurpleAirReadingsFetcher`.
 - Layers depend downward only: `fetchers → registry → api → entities`. A layer's top-level package never imports from a provider sub-package, and a provider sub-package never imports from a *sibling layer's* provider sub-package except along that same direction. Provider-agnostic interfaces must not mention provider types — generify them (as `ISensorRegistry<S, I>`) rather than leak `PurpleAir*` into a top-level package.
 - If a class would work unchanged for another provider, it does not belong in a provider sub-package.
+- The analyzer's layers:
+  - `entities/` — `Reading`, `RollingAverageSnapshot`.
+  - `analysis/` — `RollingAverage`: the per-sensor rolling window; produces and restores from `RollingAverageSnapshot`.
+  - `persistence/` — durable snapshot storage: `ISnapshotStore`; `LoggingSnapshotStore` is the provider-agnostic stand-in. A real store goes in `persistence/<provider>/` (e.g. `persistence/redis/`) and is swapped in `Wiring`.
+  - Direction: `PollutionDataAnalyzerService → persistence, analysis → entities`.
+- Every entity gets its own `.java` file — never nest one entity record inside another.
+- JSON outside Kafka (persistence, snapshots) goes through `com.pollution.common.json.JsonSupport` (`toJson`/`fromJson`, throwing the unchecked `JsonException`). It holds the single shared Jackson configuration; the Kafka serializers use it too, so nothing else in the project may build its own `ObjectMapper`.
 
 ## Design rules
 

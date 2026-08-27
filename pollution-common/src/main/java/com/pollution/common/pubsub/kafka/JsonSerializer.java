@@ -1,6 +1,7 @@
 package com.pollution.common.pubsub.kafka;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.pollution.common.json.JsonException;
+import com.pollution.common.json.JsonSupport;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.Serializer;
 
@@ -15,8 +16,8 @@ public class JsonSerializer<T> implements Serializer<T> {
             return null;
         }
         try {
-            return JsonSupport.MAPPER.writeValueAsBytes(data);
-        } catch (JsonProcessingException e) {
+            return JsonSupport.toJsonBytes(data);
+        } catch (JsonException e) {
             throw new SerializationException("failed to serialize " + data.getClass().getSimpleName()
                     + " for topic " + topic, e);
         }
