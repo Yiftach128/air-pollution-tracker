@@ -1,0 +1,144 @@
+package com.pollution.alertservice;
+
+import com.pollution.alertservice.detection.ThresholdDetector;
+import com.pollution.alertservice.entities.AlertSeries;
+import com.pollution.alertservice.persistence.IAlertCooldownStore;
+import com.pollution.alertservice.senders.IAlertSender;
+import com.pollution.common.PollutionLogger;
+import com.pollution.common.entities.PollutionAlert;
+import com.pollution.common.entities.PollutionAverage;
+import com.pollution.common.entities.PollutionData;
+import com.pollution.common.pubsub.IPublisher;
+import com.pollution.common.pubsub.ISubscriber;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import org.slf4j.Logger;
+
+/**
+ * Consumes the streams of {@link PollutionData} readings and
+ * {@link PollutionAverage}s, runs each through a {@link ThresholdDetector},
+ * and raises every alert it finds: delivers it through the
+ * {@link IAlertSender} and publishes it as a {@link PollutionAlert} for
+ * whoever stores alerts. The two are independent — a failure of one is
+ * logged and does not stop the other.
+ * <p>
+ * A series (source, pollutant, window) alerts at most once per its cooldown,
+ * tracked in the {@link IAlertCooldownStore}; and while a longer measurement
+ * of the same source and pollutant is cooling down, shorter ones are old
+ * news and stay quiet (a spike is not worth a post when the hour is already
+ * alerting). The cooldown starts after the delivery attempts, whether or not
+ * they succeeded — the inputs repeat every few seconds, so retrying a broken
+ * channel would only flood it. If the store cannot be read the alert is
+ * raised anyway: an outage may cause duplicate alerts, never missed ones.
+ * <p>
+ * Messages arrive on the two subscribers' threads; {@link #lock} serializes
+ * raising, so the sender is never entered concurrently and the cooldown
+ * check-then-mark is atomic within this instance.
+ */
+public class PollutionAlertService implements AutoCloseable {
+
+    private static final Logger logger = PollutionLogger.getLogger(PollutionAlertService.class);
+
+    private final ISubscriber<PollutionData> pollutionSubscriber;
+    private final ISubscriber<PollutionAverage> averageSubscriber;
+    private final ThresholdDetector detector;
+    private final IAlertCooldownStore cooldownStore;
+    private final IAlertSender alertSender;
+    private final IPublisher<PollutionAlert> alertPublisher;
+
+    private final Object lock = new Object();
+
+    public PollutionAlertService(ISubscriber<PollutionData> pollutionSubscriber,
+                                 ISubscriber<PollutionAverage> averageSubscriber,
+                                 ThresholdDetector detector,
+                                 IAlertCooldownStore cooldownStore,
+                                 IAlertSender alertSender,
+                                 IPublisher<PollutionAlert> alertPublisher) {
+        this.pollutionSubscriber = Objects.requireNonNull(pollutionSubscriber, "pollutionSubscriber");
+        this.averageSubscriber = Objects.requireNonNull(averageSubscriber, "averageSubscriber");
+        this.detector = Objects.requireNonNull(detector, "detector");
+        this.cooldownStore = Objects.requireNonNull(cooldownStore, "cooldownStore");
+        this.alertSender = Objects.requireNonNull(alertSender, "alertSender");
+        this.alertPublisher = Objects.requireNonNull(alertPublisher, "alertPublisher");
+    }
+
+    public void start() {
+        pollutionSubscriber.subscribe(this::handleReading);
+        averageSubscriber.subscribe(this::handleAverage);
+        logger.info("subscribed to pollution readings and averages");
+    }
+
+    private void handleReading(PollutionData reading) {
+        logger.debug("received {}", reading);
+        detector.detect(reading).forEach(this::raise);
+    }
+
+    private void handleAverage(PollutionAverage average) {
+        logger.debug("received {}", average);
+        detector.detect(average).forEach(this::raise);
+    }
+
+    private void raise(PollutionAlert alert) {
+        AlertSeries series = AlertSeries.of(alert);
+        synchronized (lock) {
+            Set<AlertSeries> coolingDown = coolingDownSeries(series);
+            if (coolingDown.contains(series)) {
+                logger.debug("{}: still cooling down; suppressed {}", series, alert);
+                return;
+            }
+            Optional<AlertSeries> longer = coolingDown.stream().filter(other -> other.supersedes(series)).findFirst();
+            if (longer.isPresent()) {
+                logger.debug("{}: old news while {} is alerting; suppressed {}", series, longer.get(), alert);
+                return;
+            }
+            send(alert);
+            publish(alert);
+            markSent(alert);
+        }
+        logger.info("raised {}", alert);
+    }
+
+    /** A store that cannot be read counts as nothing cooling down: better a duplicate alert than a missed one. */
+    private Set<AlertSeries> coolingDownSeries(AlertSeries series) {
+        try {
+            return cooldownStore.coolingDownSeries(series.source(), series.pollutant());
+        } catch (RuntimeException e) {
+            logger.error("{}: failed to read cooldown state; alerting anyway", series, e);
+            return Set.of();
+        }
+    }
+
+    private void send(PollutionAlert alert) {
+        try {
+            alertSender.send(alert);
+        } catch (RuntimeException e) {
+            logger.error("failed to send {}", alert, e);
+        }
+    }
+
+    private void publish(PollutionAlert alert) {
+        try {
+            alertPublisher.send(alert, alert.source());
+        } catch (RuntimeException e) {
+            logger.error("failed to publish {}", alert, e);
+        }
+    }
+
+    private void markSent(PollutionAlert alert) {
+        try {
+            cooldownStore.markSent(alert);
+        } catch (RuntimeException e) {
+            logger.error("failed to record cooldown for {}", alert, e);
+        }
+    }
+
+    @Override
+    public void close() {
+        pollutionSubscriber.close();
+        averageSubscriber.close();
+        alertPublisher.close();
+        cooldownStore.close();
+        alertSender.close();
+    }
+}

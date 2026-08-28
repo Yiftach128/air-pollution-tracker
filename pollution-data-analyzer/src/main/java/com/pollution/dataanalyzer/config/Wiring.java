@@ -2,8 +2,8 @@ package com.pollution.dataanalyzer.config;
 
 import static com.pollution.common.config.Config.POLLUTION_AVERAGE_TOPIC;
 import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
-import static com.pollution.persistence.config.Config.getRedisHost;
-import static com.pollution.persistence.config.Config.getRedisPort;
+import static com.pollution.persistence.redis.config.Config.getRedisHost;
+import static com.pollution.persistence.redis.config.Config.getRedisPort;
 
 import com.pollution.common.entities.PollutionAverage;
 import com.pollution.common.entities.PollutionData;
@@ -41,7 +41,8 @@ public final class Wiring {
     public static IRollingAverageStateStore createStateStore() {
         IPollutionCache<RollingAverageState> cache =
                 new RedisPollutionCache<>(getRedisHost(), getRedisPort(), RollingAverageState.class);
-        return new CacheBackedRollingAverageStateStore(cache, Config.ROLLING_AVERAGE_STATE_KEY_PREFIX);
+        return new CacheBackedRollingAverageStateStore(
+                cache, Config.ROLLING_AVERAGE_STATE_KEY_PREFIX, Config.getRollingAverageStateTtl());
     }
 
     public static PollutionDataAnalyzerService createAnalyzerService(ISubscriber<PollutionData> pollutionSubscriber,

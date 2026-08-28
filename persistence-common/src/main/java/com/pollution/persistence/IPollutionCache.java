@@ -1,5 +1,6 @@
 package com.pollution.persistence;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,8 +18,17 @@ import java.util.Optional;
  */
 public interface IPollutionCache<T> extends AutoCloseable {
 
-    /** Stores the object under the key, replacing any previous value. */
+    /** Stores the object under the key, replacing any previous value; it stays until removed or replaced. */
     void setObjectValue(String key, T value);
+
+    /**
+     * Stores the object under the key, replacing any previous value, and
+     * removes it automatically once {@code ttl} has passed. Storing the key
+     * again restarts the clock (with whichever lifetime that store gives it).
+     *
+     * @param ttl how long the object lives; must be positive
+     */
+    void setObjectValue(String key, T value, Duration ttl);
 
     /** The object stored under the key, or empty if there is none. */
     Optional<T> getObjectValue(String key);

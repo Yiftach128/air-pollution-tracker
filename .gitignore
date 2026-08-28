@@ -5,3 +5,6 @@ logs/
 
 # local PurpleAir API response dumps
 data-example.json
+
+# local settings and secrets (Telegram bot token, ...); see .env.example
+.env

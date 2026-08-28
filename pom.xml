@@ -15,9 +15,12 @@
     <modules>
         <module>pollution-common</module>
         <module>persistence-common</module>
+        <module>persistence-redis</module>
+        <module>persistence-postgres</module>
         <module>pollution-data-collector</module>
         <module>pollution-data-writer</module>
         <module>pollution-data-analyzer</module>
+        <module>pollution-alert-service</module>
     </modules>
 
     <properties>

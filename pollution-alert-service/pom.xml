@@ -10,16 +10,26 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>persistence-common</artifactId>
+    <artifactId>pollution-alert-service</artifactId>
     <packaging>jar</packaging>
 
-    <name>persistence-common</name>
-    <description>Shared persistence abstractions (cache and repositories) for the polluted-air microservices; no backend drivers</description>
+    <name>pollution-alert-service</name>
+    <description>Service that detects pollution threshold exceedances and delivers alerts</description>
 
     <dependencies>
         <dependency>
             <groupId>com.pollution</groupId>
             <artifactId>pollution-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-redis</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

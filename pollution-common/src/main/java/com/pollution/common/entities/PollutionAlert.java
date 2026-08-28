@@ -1,15 +1,19 @@
 package com.pollution.common.entities;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Raised when a pollutant's concentration at a source exceeds its threshold.
+ * Raised when a pollutant's concentration at a source exceeds its threshold:
+ * either a single reading did, or the rolling average over one
+ * {@link #window() window} did.
  */
 public final class PollutionAlert extends AbstractMessage {
 
     private final String source;
     private final Pollutant pollutant;
+    private final Duration window;
     private final double measuredValue;
     private final double threshold;
 
@@ -17,19 +21,27 @@ public final class PollutionAlert extends AbstractMessage {
      * @param city          the city the source is located in
      * @param source        identifier of the sensor/station where the threshold was exceeded
      * @param pollutant     the pollutant that exceeded its threshold
-     * @param measuredValue the concentration that triggered the alert, in {@link Pollutant#unit()}
+     * @param window        the rolling-average window whose mean exceeded the threshold,
+     *                      or {@code null} when a single reading did; positive if given
+     * @param measuredValue the concentration that triggered the alert — the reading, or
+     *                      the window's mean — in {@link Pollutant#unit()}
      * @param threshold     the threshold that was exceeded, in {@link Pollutant#unit()}
-     * @param timestamp     when the alert was raised
+     * @param timestamp     the instant of the measurement that triggered the alert
      */
     public PollutionAlert(String city,
                           String source,
                           Pollutant pollutant,
+                          Duration window,
                           double measuredValue,
                           double threshold,
                           Instant timestamp) {
         super(city, timestamp);
         this.source = Objects.requireNonNull(source, "source");
         this.pollutant = Objects.requireNonNull(pollutant, "pollutant");
+        if (window != null && (window.isZero() || window.isNegative())) {
+            throw new IllegalArgumentException("window must be positive, was " + window);
+        }
+        this.window = window;
         this.measuredValue = measuredValue;
         this.threshold = threshold;
     }
@@ -42,6 +54,14 @@ public final class PollutionAlert extends AbstractMessage {
     /** The pollutant that exceeded its threshold. */
     public Pollutant pollutant() {
         return pollutant;
+    }
+
+    /**
+     * The rolling-average window whose mean exceeded the threshold, or
+     * {@code null} when a single reading did.
+     */
+    public Duration window() {
+        return window;
     }
 
     /** The concentration that triggered the alert, in {@link Pollutant#unit()}. */
@@ -65,6 +85,7 @@ public final class PollutionAlert extends AbstractMessage {
         return city().equals(that.city())
                 && source.equals(that.source)
                 && pollutant == that.pollutant
+                && Objects.equals(window, that.window)
                 && Double.compare(measuredValue, that.measuredValue) == 0
                 && Double.compare(threshold, that.threshold) == 0
                 && timestamp().equals(that.timestamp());
@@ -72,7 +93,7 @@ public final class PollutionAlert extends AbstractMessage {
 
     @Override
     public int hashCode() {
-        return Objects.hash(city(), source, pollutant, measuredValue, threshold, timestamp());
+        return Objects.hash(city(), source, pollutant, window, measuredValue, threshold, timestamp());
     }
 
     @Override
@@ -80,6 +101,7 @@ public final class PollutionAlert extends AbstractMessage {
         return "PollutionAlert{city=" + city() + ", source=" + source
                 + ", " + pollutant.displayName() + "=" + measuredValue
                 + " exceeds " + threshold + " " + pollutant.unit()
+                + (window == null ? " (reading)" : " over " + window)
                 + ", at=" + timestamp() + "}";
     }
 }

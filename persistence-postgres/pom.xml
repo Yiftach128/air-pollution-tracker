@@ -10,16 +10,16 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>persistence-common</artifactId>
+    <artifactId>persistence-postgres</artifactId>
     <packaging>jar</packaging>
 
-    <name>persistence-common</name>
-    <description>Shared persistence abstractions (cache and repositories) for the polluted-air microservices; no backend drivers</description>
+    <name>persistence-postgres</name>
+    <description>PostgreSQL implementation of the shared repository abstractions for the polluted-air microservices</description>
 
     <dependencies>
         <dependency>
             <groupId>com.pollution</groupId>
-            <artifactId>pollution-common</artifactId>
+            <artifactId>persistence-common</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

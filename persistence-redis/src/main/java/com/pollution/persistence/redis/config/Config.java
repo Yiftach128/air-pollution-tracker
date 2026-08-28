@@ -1,8 +1,8 @@
-package com.pollution.persistence.config;
+package com.pollution.persistence.redis.config;
 
 import com.pollution.common.config.Env;
 
-/** Connection settings for the shared cache; values only. */
+/** Connection settings for the Redis-backed cache; values only. */
 public final class Config {
 
     private static final String DEFAULT_REDIS_HOST = "localhost";

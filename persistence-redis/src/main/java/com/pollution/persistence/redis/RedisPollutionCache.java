@@ -4,6 +4,7 @@ import com.pollution.common.PollutionLogger;
 import com.pollution.common.json.JsonSupport;
 import com.pollution.persistence.IPollutionCache;
 import com.pollution.persistence.PollutionCacheException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,12 +15,14 @@ import org.slf4j.Logger;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.params.SetParams;
 import redis.clients.jedis.resps.ScanResult;
 
 /**
  * An {@link IPollutionCache} where every object is its own Redis key holding
- * the JSON produced by {@link JsonSupport}. Pattern lookups use {@code SCAN}
- * rather than {@code KEYS}, so they never block the server.
+ * the JSON produced by {@link JsonSupport}. Lifetimes map onto Redis key
+ * expiry ({@code SET ... PX}). Pattern lookups use {@code SCAN} rather than
+ * {@code KEYS}, so they never block the server.
  *
  * @param <T> the value type
  */
@@ -53,6 +56,22 @@ public class RedisPollutionCache<T> implements IPollutionCache<T> {
             redis.set(key, json);
         } catch (JedisException e) {
             throw new PollutionCacheException("failed to set key " + key, e);
+        }
+    }
+
+    @Override
+    public void setObjectValue(String key, T value, Duration ttl) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(value, "value");
+        Objects.requireNonNull(ttl, "ttl");
+        if (ttl.isNegative() || ttl.isZero()) {
+            throw new IllegalArgumentException("ttl must be positive, was " + ttl);
+        }
+        String json = JsonSupport.toJson(value);
+        try {
+            redis.set(key, json, SetParams.setParams().px(ttl.toMillis()));
+        } catch (JedisException e) {
+            throw new PollutionCacheException("failed to set key " + key + " with ttl " + ttl, e);
         }
     }
 
