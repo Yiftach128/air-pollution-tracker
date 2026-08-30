@@ -14,12 +14,27 @@
     <packaging>jar</packaging>
 
     <name>pollution-data-writer</name>
-    <description>Service that writes pollution data</description>
+    <description>Service that stores pollution readings in PostgreSQL and each series' current reading in Redis</description>
 
     <dependencies>
         <dependency>
             <groupId>com.pollution</groupId>
             <artifactId>pollution-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-postgres</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-redis</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

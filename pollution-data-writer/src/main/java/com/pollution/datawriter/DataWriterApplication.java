@@ -7,6 +7,8 @@ import com.pollution.common.entities.PollutionData;
 import com.pollution.common.pubsub.ISubscriber;
 import com.pollution.datawriter.config.Config;
 import com.pollution.datawriter.config.Wiring;
+import com.pollution.persistence.ILatestReadingStore;
+import com.pollution.persistence.IPollutionRepository;
 import org.slf4j.Logger;
 
 public class DataWriterApplication {
@@ -18,26 +20,12 @@ public class DataWriterApplication {
         ISubscriber<PollutionData> pollutionSubscriber = Wiring.createPollutionSubscriber();
         ISubscriber<PollutionAverage> averageSubscriber = Wiring.createAverageSubscriber();
         ISubscriber<PollutionAlert> alertSubscriber = Wiring.createAlertSubscriber();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            pollutionSubscriber.close();
-            averageSubscriber.close();
-            alertSubscriber.close();
-        }, "subscriber-shutdown"));
-        pollutionSubscriber.subscribe(DataWriterApplication::handleMessage);
-        averageSubscriber.subscribe(DataWriterApplication::handleMessage);
-        alertSubscriber.subscribe(DataWriterApplication::handleMessage);
+        IPollutionRepository repository = Wiring.createPollutionRepository();
+        ILatestReadingStore latestReadings = Wiring.createLatestReadingStore();
+        PollutionDataWriterService service = Wiring.createWriterService(
+                pollutionSubscriber, averageSubscriber, alertSubscriber, repository, latestReadings);
+        Runtime.getRuntime().addShutdownHook(new Thread(service::close, "writer-shutdown"));
+        service.start();
         logger.info("{} subscribed and running", Config.SERVICE_NAME);
-    }
-
-    private static void handleMessage(PollutionData reading) {
-        logger.info("received {}", reading);
-    }
-
-    private static void handleMessage(PollutionAverage average) {
-        logger.info("received {}", average);
-    }
-
-    private static void handleMessage(PollutionAlert alert) {
-        logger.info("received {}", alert);
     }
 }

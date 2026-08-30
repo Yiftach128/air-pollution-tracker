@@ -18,6 +18,11 @@
         </encoder>
     </appender>
 
+    <!-- Hibernate logs every SQLException at WARN+ERROR before rethrowing it. The exceptions the
+         project expects (a reading already stored, a database that is down) are handled and logged
+         by the code that catches them, so the duplicate lines are noise. -->
+    <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
