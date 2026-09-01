@@ -1,0 +1,52 @@
+/* The dashboard's theme: every colour, shape and font the pages use, as
+   custom properties. Dark blue, and only that — there is no light palette.
+   The components (style.css) and the charts (through getComputedStyle) read
+   these; nothing else declares a colour. */
+
+:root {
+  color-scheme: dark;
+
+  /* ground and surfaces, darkest to lightest */
+  --page: #0a1120;
+  --surface: #111a2e;
+  --raised: #182540;
+  --hover: #1d2c4b;
+
+  /* lines */
+  --border: rgba(147, 176, 227, 0.14);
+  --border-strong: rgba(147, 176, 227, 0.32);
+  --grid: #1c2942;
+  --axis: #2b3b5e;
+
+  /* text, most to least prominent */
+  --text: #e7eefa;
+  --text-secondary: #aab9d4;
+  --muted: #7586a6;
+
+  /* the one interactive colour: links, focus, calls to action */
+  --accent: #4d8dff;
+  --accent-hover: #79a8ff;
+  --focus: rgba(77, 141, 255, 0.6);
+
+  /* states */
+  --ok: #3ecf8e;
+  --stale: #7586a6;
+  --exceed: #ff6b6b; /* a value above its threshold: the one warm colour, used sparingly */
+  --error-bg: #3a1a24;
+  --error-text: #ffb3bf;
+  --error-border: rgba(255, 120, 140, 0.35);
+
+  /* one colour per pollutant, kept everywhere it appears: tile, swatch, line, band */
+  --pm2_5: #6db8ff;
+  --pm10: #ff9457;
+  --no2: #45d39a;
+  --o3: #ffc94d;
+  --so2: #ff86bd;
+  --co: #b39cff;
+
+  /* shape and type */
+  --radius: 12px;
+  --radius-small: 7px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.65);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

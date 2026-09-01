@@ -21,6 +21,7 @@
         <module>pollution-data-writer</module>
         <module>pollution-data-analyzer</module>
         <module>pollution-alert-service</module>
+        <module>pollution-api-service</module>
     </modules>
 
     <properties>

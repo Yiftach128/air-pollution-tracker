@@ -10,6 +10,7 @@ import com.pollution.common.entities.PollutionAverage;
 import com.pollution.common.entities.PollutionData;
 import com.pollution.common.pubsub.IPublisher;
 import com.pollution.common.pubsub.ISubscriber;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -27,7 +28,12 @@ import org.slf4j.Logger;
  * tracked in the {@link IAlertCooldownStore}; and while a longer measurement
  * of the same source and pollutant is cooling down, shorter ones are old
  * news and stay quiet (a spike is not worth a post when the hour is already
- * alerting). The cooldown starts after the delivery attempts, whether or not
+ * alerting). For that rule to apply within one message too, the alerts of
+ * one {@link PollutionAverage} are raised longest window first: when the
+ * hour and the ten minutes exceed at once, the hour's alert goes out and the
+ * ten minutes' is dropped as superseded — one post, not two, and the same
+ * again each time the hour's cooldown lapses. The cooldown starts after the
+ * delivery attempts, whether or not
  * they succeeded — the inputs repeat every few seconds, so retrying a broken
  * channel would only flood it. If the store cannot be read the alert is
  * raised anyway: an outage may cause duplicate alerts, never missed ones.
@@ -39,6 +45,10 @@ import org.slf4j.Logger;
 public class PollutionAlertService implements AutoCloseable {
 
     private static final Logger logger = PollutionLogger.getLogger(PollutionAlertService.class);
+
+    /** The order a message's average alerts are raised in; every average alert has a window. */
+    private static final Comparator<PollutionAlert> LONGEST_WINDOW_FIRST =
+            Comparator.comparing(PollutionAlert::window, Comparator.reverseOrder());
 
     private final ISubscriber<PollutionData> pollutionSubscriber;
     private final ISubscriber<PollutionAverage> averageSubscriber;
@@ -76,7 +86,8 @@ public class PollutionAlertService implements AutoCloseable {
 
     private void handleAverage(PollutionAverage average) {
         logger.debug("received {}", average);
-        detector.detect(average).forEach(this::raise);
+        // longest window first: once the hour's alert is out, the 10-minute one of the same message is old news
+        detector.detect(average).stream().sorted(LONGEST_WINDOW_FIRST).forEach(this::raise);
     }
 
     private void raise(PollutionAlert alert) {

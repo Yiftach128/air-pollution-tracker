@@ -1,0 +1,16 @@
+{
+  "baselines": {
+    "PM2_5": 25,
+    "PM10": 45,
+    "NO2": 25,
+    "O3": 100,
+    "SO2": 40,
+    "CO": 4
+  },
+  "windowFactors": {
+    "PT24H": 1,
+    "PT1H": 1.25,
+    "PT10M": 1.35
+  },
+  "readingFactor": 2
+}

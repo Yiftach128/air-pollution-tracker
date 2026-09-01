@@ -23,6 +23,7 @@ import com.pollution.common.pubsub.kafka.JsonDeserializer;
 import com.pollution.common.pubsub.kafka.JsonSerializer;
 import com.pollution.common.pubsub.kafka.KafkaPublisher;
 import com.pollution.common.pubsub.kafka.KafkaSubscriber;
+import com.pollution.common.thresholds.Thresholds;
 import com.pollution.persistence.IPollutionCache;
 import com.pollution.persistence.redis.RedisPollutionCache;
 
@@ -48,10 +49,12 @@ public final class Wiring {
         return new KafkaPublisher<>(POLLUTION_ALERT_TOPIC, new JsonSerializer<>());
     }
 
-    public static IAlertCooldownStore createCooldownStore() {
+    /** @param thresholds the thresholds: each window they have a factor for gets a cooldown */
+    public static IAlertCooldownStore createCooldownStore(Thresholds thresholds) {
         IPollutionCache<PollutionAlert> cache =
                 new RedisPollutionCache<>(getRedisHost(), getRedisPort(), PollutionAlert.class);
-        AlertCooldowns cooldowns = new AlertCooldowns(Config.getWindowCooldowns(), Config.getReadingCooldown());
+        AlertCooldowns cooldowns = new AlertCooldowns(
+                Config.getWindowCooldowns(thresholds.windowFactors().keySet()), Config.getReadingCooldown());
         return new CacheBackedAlertCooldownStore(cache, Config.LAST_SENT_KEY_PREFIX, cooldowns);
     }
 
@@ -76,9 +79,10 @@ public final class Wiring {
                                                            ISubscriber<PollutionAverage> averageSubscriber,
                                                            IPublisher<PollutionAlert> alertPublisher,
                                                            IAlertCooldownStore cooldownStore,
-                                                           IAlertSender alertSender) {
+                                                           IAlertSender alertSender,
+                                                           Thresholds thresholds) {
         ThresholdDetector detector = new ThresholdDetector(
-                Config.getThresholds(), Config.getWindowThresholdFactors(), Config.getReadingThresholdFactor());
+                thresholds.baselines(), thresholds.windowFactors(), thresholds.readingFactor());
         return new PollutionAlertService(
                 pollutionSubscriber, averageSubscriber, detector, cooldownStore, alertSender, alertPublisher);
     }

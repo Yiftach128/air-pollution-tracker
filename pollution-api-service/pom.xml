@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.pollution</groupId>
+        <artifactId>air-pollution-tracker</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>pollution-api-service</artifactId>
+    <packaging>jar</packaging>
+
+    <name>pollution-api-service</name>
+    <description>Service that serves the dashboard: each source's current reading from Redis and its history from PostgreSQL, over HTTP</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>pollution-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-postgres</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>persistence-redis</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- the HTTP server is the JDK's own (module jdk.httpserver); no dependency needed -->
+    </dependencies>
+</project>

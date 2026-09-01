@@ -10,6 +10,7 @@ import com.pollution.common.entities.PollutionAverage;
 import com.pollution.common.entities.PollutionData;
 import com.pollution.common.pubsub.IPublisher;
 import com.pollution.common.pubsub.ISubscriber;
+import com.pollution.common.thresholds.Thresholds;
 import org.slf4j.Logger;
 
 public class AlertServiceApplication {
@@ -21,10 +22,11 @@ public class AlertServiceApplication {
         ISubscriber<PollutionData> pollutionSubscriber = Wiring.createPollutionSubscriber();
         ISubscriber<PollutionAverage> averageSubscriber = Wiring.createAverageSubscriber();
         IPublisher<PollutionAlert> alertPublisher = Wiring.createAlertPublisher();
-        IAlertCooldownStore cooldownStore = Wiring.createCooldownStore();
+        Thresholds thresholds = Config.getThresholds();
+        IAlertCooldownStore cooldownStore = Wiring.createCooldownStore(thresholds);
         IAlertSender alertSender = Wiring.createAlertSender();
         PollutionAlertService service = Wiring.createAlertService(
-                pollutionSubscriber, averageSubscriber, alertPublisher, cooldownStore, alertSender);
+                pollutionSubscriber, averageSubscriber, alertPublisher, cooldownStore, alertSender, thresholds);
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "alert-service-shutdown"));
         service.start();
         logger.info("{} subscribed and running", Config.SERVICE_NAME);

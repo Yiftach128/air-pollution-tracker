@@ -1,13 +1,16 @@
 package com.pollution.alertservice.config;
 
+import static com.pollution.common.config.Config.getThresholdsFile;
+
 import com.pollution.common.config.Env;
-import com.pollution.common.entities.Pollutant;
+import com.pollution.common.thresholds.Thresholds;
+import com.pollution.common.thresholds.ThresholdsLoader;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The alert service's settings. Values only; see {@link Wiring} for how the
@@ -19,43 +22,6 @@ public final class Config {
 
     /** Cache key prefix for the last alert sent for a series; the source, pollutant and window are appended. */
     public static final String LAST_SENT_KEY_PREFIX = "alert:last-sent:";
-
-    /**
-     * Concentrations above which a measurement is an alert, in each
-     * pollutant's unit: the WHO 2021 air quality guideline levels (24-hour
-     * means; 8-hour for O3 and CO), except PM2.5, set at 25 — WHO's 2021
-     * interim target 4 (its 2005 guideline) — since the 2021 level of 15 is
-     * exceeded too routinely to be worth a post. Each is overridden by the
-     * env var {@code ALERT_THRESHOLD_<POLLUTANT>} (e.g. {@code ALERT_THRESHOLD_PM2_5}) when set.
-     */
-    private static final Map<Pollutant, Double> DEFAULT_THRESHOLDS = Map.of(
-            Pollutant.PM2_5, 25.0,
-            Pollutant.PM10, 45.0,
-            Pollutant.NO2, 25.0,
-            Pollutant.O3, 100.0,
-            Pollutant.SO2, 40.0,
-            Pollutant.CO, 4.0
-    );
-    private static final String THRESHOLD_ENV_PREFIX = "ALERT_THRESHOLD_";
-
-    /**
-     * How much higher than its pollutant's threshold a measurement must be to
-     * alert, by measurement type. The thresholds above are 24-hour guideline
-     * levels, so a 24-hour average uses them as they are (×1); shorter windows
-     * swing more, so they need more; a single reading — a spike — the most.
-     * Each is overridden by {@code ALERT_THRESHOLD_FACTOR_<WINDOW>} with the
-     * window in ISO-8601 ({@code ALERT_THRESHOLD_FACTOR_PT10M}, {@code _PT1H},
-     * {@code _PT24H}) and {@code ALERT_THRESHOLD_FACTOR_RAW} for single
-     * readings. A window with no factor uses ×1.
-     */
-    private static final Map<Duration, Double> DEFAULT_WINDOW_THRESHOLD_FACTORS = Map.of(
-            Duration.ofMinutes(10), 2.0,
-            Duration.ofHours(1), 1.5,
-            Duration.ofHours(24), 1.0
-    );
-    private static final double DEFAULT_READING_THRESHOLD_FACTOR = 2.5;
-    private static final String THRESHOLD_FACTOR_ENV_PREFIX = "ALERT_THRESHOLD_FACTOR_";
-    private static final String READING_THRESHOLD_FACTOR_ENV = THRESHOLD_FACTOR_ENV_PREFIX + "RAW";
 
     /**
      * How long a series stays quiet after an alert — the inputs repeat every
@@ -88,38 +54,20 @@ public final class Config {
     private Config() {
     }
 
-    /** The threshold of every {@link Pollutant}. */
-    public static Map<Pollutant, Double> getThresholds() {
-        Map<Pollutant, Double> thresholds = new EnumMap<>(Pollutant.class);
-        for (Pollutant pollutant : Pollutant.values()) {
-            Double defaultThreshold = DEFAULT_THRESHOLDS.get(pollutant);
-            if (defaultThreshold == null) {
-                throw new IllegalStateException("no default alert threshold for " + pollutant);
-            }
-            thresholds.put(pollutant, Env.getDouble(THRESHOLD_ENV_PREFIX + pollutant.name(), defaultThreshold));
-        }
-        return Collections.unmodifiableMap(thresholds);
+    /**
+     * The thresholds shared with every other service that judges a value
+     * against one, from {@code thresholds.json} in pollution-common — or the
+     * file {@code THRESHOLDS_FILE} names — so an alert and the dashboard's
+     * marking of the same value cannot disagree.
+     */
+    public static Thresholds getThresholds() {
+        return getThresholdsFile().map(ThresholdsLoader::load).orElseGet(ThresholdsLoader::load);
     }
 
-    /** The threshold factor of every rolling-average window that has one, keyed by window. */
-    public static Map<Duration, Double> getWindowThresholdFactors() {
-        Map<Duration, Double> factors = new HashMap<>();
-        for (Map.Entry<Duration, Double> entry : DEFAULT_WINDOW_THRESHOLD_FACTORS.entrySet()) {
-            Duration window = entry.getKey();
-            factors.put(window, Env.getDouble(THRESHOLD_FACTOR_ENV_PREFIX + window, entry.getValue()));
-        }
-        return Collections.unmodifiableMap(factors);
-    }
-
-    /** The threshold factor of a single reading. */
-    public static double getReadingThresholdFactor() {
-        return Env.getDouble(READING_THRESHOLD_FACTOR_ENV, DEFAULT_READING_THRESHOLD_FACTOR);
-    }
-
-    /** The cooldown of every rolling-average window the service knows (those with a threshold factor), keyed by window. */
-    public static Map<Duration, Duration> getWindowCooldowns() {
+    /** The cooldown of each given rolling-average window (those the thresholds have a factor for), keyed by window. */
+    public static Map<Duration, Duration> getWindowCooldowns(Set<Duration> windows) {
         Map<Duration, Duration> cooldowns = new HashMap<>();
-        for (Duration window : DEFAULT_WINDOW_THRESHOLD_FACTORS.keySet()) {
+        for (Duration window : windows) {
             long defaultMinutes = Env.getLong(COOLDOWN_ENV, window.toMinutes());
             cooldowns.put(window, Duration.ofMinutes(Env.getLong(COOLDOWN_ENV_PREFIX + window, defaultMinutes)));
         }

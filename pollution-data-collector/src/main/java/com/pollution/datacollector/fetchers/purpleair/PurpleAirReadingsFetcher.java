@@ -3,6 +3,7 @@ package com.pollution.datacollector.fetchers.purpleair;
 import com.pollution.common.PollutionLogger;
 import com.pollution.common.entities.Pollutant;
 import com.pollution.common.entities.PollutionData;
+import com.pollution.common.entities.SourceId;
 import com.pollution.datacollector.api.purpleair.PurpleAirApiException;
 import com.pollution.datacollector.api.purpleair.PurpleAirSensorApi;
 import com.pollution.datacollector.entities.purpleair.PurpleAirReading;
@@ -24,14 +25,15 @@ import org.slf4j.Logger;
  * enriched still produces readings (named after its enum constant) and is
  * retried on the next cycle.
  * <p>
- * Every {@code source} is prefixed with {@value #SOURCE_PREFIX} so readings from
- * different providers can never collide on name.
+ * Every {@code source} is a {@link SourceId} of provider {@value #PROVIDER}
+ * ({@code purpleair:<name>}), so readings from different providers can never
+ * collide on name.
  */
 public class PurpleAirReadingsFetcher implements IReadingsFetcher {
 
     private static final Logger logger = PollutionLogger.getLogger(PurpleAirReadingsFetcher.class);
-    /** Namespaces PurpleAir sources in {@link PollutionData#source()}. */
-    static final String SOURCE_PREFIX = "purpleair:";
+    /** The provider of every source this fetcher produces, see {@link PollutionData#source()}. */
+    static final String PROVIDER = "purpleair";
 
     private final PurpleAirSensorApi sensorApi;
     private final ISensorRegistry<PurpleAirSensor, PurpleAirSensorInfo> sensorRegistry;
@@ -65,13 +67,13 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
         return readings;
     }
 
-    /** {@value #SOURCE_PREFIX} + the sensor's PurpleAir name, enriching it now if startup enrichment failed. */
+    /** The {@link SourceId} of the sensor's PurpleAir name, enriching it now if startup enrichment failed. */
     private String sourceName(PurpleAirSensor sensor) {
         String name = sensorRegistry.get(sensor)
                 .or(() -> retryEnrichment(sensor))
                 .map(PurpleAirSensorInfo::name)
                 .orElse(sensor.name());
-        return SOURCE_PREFIX + name;
+        return new SourceId(PROVIDER, name).toString();
     }
 
     private Optional<PurpleAirSensorInfo> retryEnrichment(PurpleAirSensor sensor) {

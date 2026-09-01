@@ -28,15 +28,15 @@ import org.slf4j.Logger;
  * rest of the service only ever handles the entity. The message is four lines:
  * <pre>
  * 🚨 PM2.5 alert - Tel Aviv
- * 10-minute average 31.0 (exceeds 30.0)
- * Dizengoff Center
+ * High 10-minute average
+ * 31.0 µg/m³ (exceeds 30.0)
  * 14:05, 28/08/2026
  * </pre>
- * The second line names the measurement ({@code Single reading} for a spike,
- * else the window's average) and gives the value and threshold in the
- * pollutant's unit, unstated; the third is the source without its provider
- * prefix ({@code purpleair:Dizengoff Center} → {@code Dizengoff Center}); the
- * time is shown in the configured zone.
+ * The second line names the measurement ({@code High single reading} for a
+ * spike, else the window's average); the third gives the value with the
+ * pollutant's unit and the threshold, in the same unit, without repeating it;
+ * the time is shown in the configured zone.
+ * The source is not named: the city in the first line places the alert.
  * <p>
  * The bot token is part of the request URL, so the URL is never logged and
  * never put into an exception message.
@@ -48,8 +48,6 @@ public final class TelegramAlertSender implements IAlertSender {
     private static final String SEND_MESSAGE_METHOD = "sendMessage";
     private static final int MAX_QUOTED_BODY_LENGTH = 300;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy");
-    /** Sources are {@code <provider>:<name>}; people are shown the name. */
-    private static final char SOURCE_PROVIDER_SEPARATOR = ':';
 
     private final HttpClient httpClient;
     private final URI sendMessageUri;
@@ -122,16 +120,16 @@ public final class TelegramAlertSender implements IAlertSender {
     /** The message people read; see the class comment for its shape. */
     String toText(PollutionAlert alert) {
         return "🚨 " + alert.pollutant().displayName() + " alert - " + alert.city() + "\n"
-                + describeMeasurement(alert.window()) + " " + formatValue(alert.measuredValue())
+                + "High " + describeMeasurement(alert.window()) + "\n"
+                + formatValue(alert.measuredValue()) + " " + alert.pollutant().unit()
                 + " (exceeds " + formatValue(alert.threshold()) + ")\n"
-                + displayName(alert.source()) + "\n"
                 + TIME_FORMAT.format(alert.timestamp().atZone(zone));
     }
 
-    /** {@code "Single reading"}, {@code "10-minute average"}, {@code "24-hour average"}. */
+    /** {@code "single reading"}, {@code "10-minute average"}, {@code "24-hour average"}. */
     static String describeMeasurement(Duration window) {
         if (window == null) {
-            return "Single reading";
+            return "single reading";
         }
         long seconds = window.getSeconds();
         if (seconds % 3600 == 0) {
@@ -141,16 +139,6 @@ public final class TelegramAlertSender implements IAlertSender {
             return seconds / 60 + "-minute average";
         }
         return window + " average";
-    }
-
-    /** The source without its provider prefix; the source itself when it has none (or nothing after it). */
-    static String displayName(String source) {
-        int separator = source.indexOf(SOURCE_PROVIDER_SEPARATOR);
-        if (separator < 0) {
-            return source;
-        }
-        String name = source.substring(separator + 1).trim();
-        return name.isEmpty() ? source : name;
     }
 
     private static String formatValue(double value) {

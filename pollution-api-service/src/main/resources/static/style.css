@@ -1,0 +1,444 @@
+/* Air pollution tracker dashboard: the components of both pages, styled
+   with the tokens of theme.css only — no colour is declared here. */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--page);
+}
+
+body {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 0 1.5rem 3rem;
+  background: var(--page);
+  color: var(--text);
+  font: 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.25rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+h3 {
+  font-size: 0.95rem;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---- header and navigation -------------------------------------------- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 0 1.5rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.brand:hover {
+  color: var(--text);
+}
+
+.brand img {
+  width: 24px;
+  height: 24px;
+}
+
+.crumbs {
+  margin-bottom: 1rem;
+}
+
+.crumbs a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.crumbs a:hover {
+  color: var(--accent-hover);
+}
+
+.section {
+  margin-bottom: 1.75rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+/* ---- notices ----------------------------------------------------------- */
+
+.error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-small);
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.empty {
+  color: var(--muted);
+}
+
+/* ---- controls ---------------------------------------------------------- */
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--axis);
+  border-radius: var(--radius-small);
+  padding: 0.35rem 0.7rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:enabled,
+select:hover,
+input:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 1rem;
+}
+
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-secondary);
+}
+
+.custom-range {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ---- source cards ------------------------------------------------------ */
+
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* a single card outside the grid (the history page's) keeps a card's width */
+.source-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 560px);
+}
+
+.source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.15s;
+}
+
+a.source-card:hover {
+  color: inherit;
+  border-color: var(--border-strong);
+  background: var(--raised);
+  transform: translateY(-2px);
+}
+
+/* the "History ›" cue appears when the card is hovered or focused; opacity
+   rather than display, so the footer keeps its height and the cue can fade */
+a.source-card:hover .card-cta,
+a.source-card:focus-visible .card-cta {
+  opacity: 1;
+  color: var(--accent-hover);
+}
+
+@media (hover: none) {
+  .card-cta {
+    opacity: 1; /* nothing to hover on a touch screen; keep the cue visible */
+  }
+}
+
+/* provider / sensor / city, labelled */
+.card-id {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.9rem;
+  align-items: baseline;
+  margin: 0;
+}
+
+.card-id dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* one row each, however long the name: a grid item only shrinks below its
+   content with min-width 0, then the ellipsis takes over (full text in title) */
+.card-id dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-id dd.sensor {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.source-card.stale .card-id dd.sensor {
+  color: var(--text-secondary);
+}
+
+/* one tile per current reading, in the pollutant's colour */
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 7.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--raised);
+  border-radius: var(--radius-small);
+  border-left: 3px solid var(--pollutant, var(--muted));
+}
+
+.tile-name {
+  color: var(--pollutant, var(--muted));
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tile-value {
+  font-size: 1.45rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.tile-value .unit {
+  font-size: 0.75rem;
+}
+
+/* a current reading above its threshold: the value and the tile's edge turn
+   warm; the pollutant's name keeps its colour and the card stays as it is */
+.tile.exceeding {
+  border-left-color: var(--exceed);
+}
+
+.tile.exceeding .tile-value {
+  color: var(--exceed);
+}
+
+.no-readings {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.reported {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.source-card.stale .dot {
+  background: var(--stale);
+}
+
+.card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* inline SVG glyphs: sized to the text, drawn in its colour */
+.icon {
+  width: 1.05em;
+  height: 1.05em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.unit {
+  color: var(--muted);
+  font-weight: normal;
+  margin-left: 0.25rem;
+}
+
+/* ---- history ----------------------------------------------------------- */
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 540px), 1fr));
+  gap: 1rem;
+}
+
+.charts.loading {
+  opacity: 0.5;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  box-shadow: var(--shadow);
+}
+
+.chart-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.summary {
+  color: var(--text-secondary);
+  margin: 0.2rem 0 0.6rem;
+}
+
+.summary strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-box {
+  position: relative;
+  height: 280px;
+}
+
+@media (max-width: 600px) {
+  body {
+    padding: 0 1rem 2rem;
+  }
+
+  .source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-box {
+    height: 220px;
+  }
+}

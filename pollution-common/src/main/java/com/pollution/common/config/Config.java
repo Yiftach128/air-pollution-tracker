@@ -1,5 +1,8 @@
 package com.pollution.common.config;
 
+import java.nio.file.Path;
+import java.util.Optional;
+
 public final class Config {
 
     public static final String POLLUTION_DATA_TOPIC = "pollution-data";
@@ -22,5 +25,15 @@ public final class Config {
 
     public static String getKafkaBootstrapServers() {
         return getKafkaHost() + ":" + getKafkaPort();
+    }
+
+    /**
+     * The thresholds file to read instead of the {@code thresholds.json}
+     * packaged in this module, when {@code THRESHOLDS_FILE} names one; see
+     * {@link com.pollution.common.thresholds.ThresholdsLoader}.
+     */
+    public static Optional<Path> getThresholdsFile() {
+        String file = Env.getString("THRESHOLDS_FILE", "");
+        return file.isBlank() ? Optional.empty() : Optional.of(Path.of(file));
     }
 }

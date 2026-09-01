@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Air pollution tracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="page-header">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">Air pollution tracker</a>
+  </header>
+
+  <div id="error" class="error" role="alert" hidden></div>
+
+  <main>
+    <section class="section">
+      <div class="section-header">
+        <h2>Right now</h2>
+        <span id="source-count" class="muted"></span>
+      </div>
+      <div id="sources" class="source-grid"></div>
+      <p id="overview-empty" class="empty" hidden>No sensors yet — nothing has been stored.</p>
+    </section>
+  </main>
+
+  <script type="module" src="/overview.js"></script>
+</body>
+</html>

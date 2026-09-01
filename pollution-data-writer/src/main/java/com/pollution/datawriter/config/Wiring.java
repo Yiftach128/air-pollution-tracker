@@ -3,6 +3,7 @@ package com.pollution.datawriter.config;
 import static com.pollution.common.config.Config.POLLUTION_ALERT_TOPIC;
 import static com.pollution.common.config.Config.POLLUTION_AVERAGE_TOPIC;
 import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
+import static com.pollution.persistence.config.Config.getLatestReadingTtl;
 import static com.pollution.persistence.postgres.config.Config.getPostgresJdbcUrl;
 import static com.pollution.persistence.postgres.config.Config.getPostgresPassword;
 import static com.pollution.persistence.postgres.config.Config.getPostgresPoolSize;
@@ -56,7 +57,7 @@ public final class Wiring {
     public static ILatestReadingStore createLatestReadingStore() {
         IPollutionCache<PollutionData> cache =
                 new RedisPollutionCache<>(getRedisHost(), getRedisPort(), PollutionData.class);
-        return new CacheBackedLatestReadingStore(cache, Config.getLatestReadingTtl());
+        return new CacheBackedLatestReadingStore(cache, getLatestReadingTtl());
     }
 
     public static PollutionDataWriterService createWriterService(ISubscriber<PollutionData> pollutionSubscriber,
