@@ -38,6 +38,15 @@ public final class Router implements IRequestHandler {
 
     @Override
     public Response handle(Request request) {
+        long started = System.nanoTime();
+        Response response = dispatch(request);
+        long durationMs = (System.nanoTime() - started) / 1_000_000;
+        logger.info("{} {} -> {} ({} ms)", request.method(), request.path(), response.status(), durationMs);
+        return response;
+    }
+
+    /** Answers the request; every throw is already mapped to a response here, so the caller always has a status to log. */
+    private Response dispatch(Request request) {
         if (!GET.equals(request.method())) {
             return Response.error(Response.METHOD_NOT_ALLOWED, "only GET is served");
         }

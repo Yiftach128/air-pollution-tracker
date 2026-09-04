@@ -6,7 +6,6 @@ import com.pollution.common.config.Env;
 import com.pollution.common.thresholds.Thresholds;
 import com.pollution.common.thresholds.ThresholdsLoader;
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,9 +46,6 @@ public final class Config {
      */
     private static final String DEFAULT_TELEGRAM_API_BASE_URL = "https://api.telegram.org";
     private static final Duration DEFAULT_TELEGRAM_TIMEOUT = Duration.ofSeconds(10);
-
-    /** The zone alert times are shown in to people; overridden by {@code ALERT_TIME_ZONE} (an IANA name). */
-    private static final String DEFAULT_ALERT_TIME_ZONE = "Asia/Jerusalem";
 
     private Config() {
     }
@@ -101,11 +97,6 @@ public final class Config {
     /** The most one Bot API request may take. */
     public static Duration getTelegramTimeout() {
         return Duration.ofSeconds(Env.getLong("TELEGRAM_TIMEOUT_SECONDS", DEFAULT_TELEGRAM_TIMEOUT.toSeconds()));
-    }
-
-    /** The time zone alert times are shown in. */
-    public static ZoneId getAlertTimeZone() {
-        return ZoneId.of(Env.getString("ALERT_TIME_ZONE", DEFAULT_ALERT_TIME_ZONE));
     }
 
     /**

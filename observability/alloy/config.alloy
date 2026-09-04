@@ -1,0 +1,58 @@
+// Tails each service's JSON log file and ships it to Loki, labelled with
+// the service (from the filename) and the level (from the JSON line).
+
+local.file_match "service_logs" {
+  path_targets = [{
+    "__path__"         = "/logs/*.json",
+    "__path_exclude__" = "/logs/*.????-??-??.json",
+  }]
+  sync_period = "10s"
+}
+
+discovery.relabel "service_logs" {
+  targets = local.file_match.service_logs.targets
+
+  rule {
+    source_labels = ["__path__"]
+    regex         = ".*/(.*)\\.json"
+    target_label  = "service"
+  }
+}
+
+loki.source.file "service_logs" {
+  targets    = discovery.relabel.service_logs.output
+  forward_to = [loki.process.service_logs.receiver]
+
+  // The logs sit on a 9p (drvfs) mount where inotify never fires; this
+  // component polls regardless, so a relaxed cadence costs nothing.
+  file_watch {
+    min_poll_frequency = "1s"
+    max_poll_frequency = "5s"
+  }
+}
+
+loki.process "service_logs" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.json {
+    expressions = {
+      level     = "",
+      timestamp = "",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339Nano"
+  }
+
+  stage.labels {
+    values = { level = "" }
+  }
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

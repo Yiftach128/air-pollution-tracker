@@ -15,6 +15,14 @@ import org.slf4j.Logger;
 
 public class AlertServiceApplication {
 
+    /* Runs before the logger field below triggers logback's configuration:
+       static initializers execute in textual order (JLS 12.4.2), and
+       Config.SERVICE_NAME is a compile-time constant, so reading it here
+       does not initialize Config or anything Config touches. */
+    static {
+        PollutionLogger.initService(Config.SERVICE_NAME);
+    }
+
     private static final Logger logger = PollutionLogger.getLogger(AlertServiceApplication.class);
 
     public static void main(String[] args) {

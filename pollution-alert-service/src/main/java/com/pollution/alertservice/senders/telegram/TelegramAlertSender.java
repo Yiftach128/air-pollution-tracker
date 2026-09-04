@@ -12,8 +12,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -25,18 +23,18 @@ import org.slf4j.Logger;
  * of the channel with permission to post.
  * <p>
  * The {@link PollutionAlert} is turned into words only here, at the edge; the
- * rest of the service only ever handles the entity. The message is four lines:
+ * rest of the service only ever handles the entity. The message is five lines:
  * <pre>
- * 🚨 PM2.5 alert - Tel Aviv
- * High 10-minute average
- * 31.0 µg/m³ (exceeds 30.0)
- * 14:05, 28/08/2026
+ * 🚨 PM2.5 alert
+ * Sensor: Tel Aviv
+ * Cause: High 10-minute average
+ * Value: 31.0 µg/m³
+ * Threshold: 30.0 µg/m³
  * </pre>
- * The second line names the measurement ({@code High single reading} for a
- * spike, else the window's average); the third gives the value with the
- * pollutant's unit and the threshold, in the same unit, without repeating it;
- * the time is shown in the configured zone.
- * The source is not named: the city in the first line places the alert.
+ * The cause names the measurement ({@code High single reading} for a spike,
+ * else the window's average); the value and the threshold each carry the
+ * pollutant's unit. The source is not named: the sensor line's city places
+ * the alert.
  * <p>
  * The bot token is part of the request URL, so the URL is never logged and
  * never put into an exception message.
@@ -47,13 +45,11 @@ public final class TelegramAlertSender implements IAlertSender {
 
     private static final String SEND_MESSAGE_METHOD = "sendMessage";
     private static final int MAX_QUOTED_BODY_LENGTH = 300;
-    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy");
 
     private final HttpClient httpClient;
     private final URI sendMessageUri;
     private final String chatId;
     private final Duration timeout;
-    private final ZoneId zone;
 
     /**
      * @param apiBaseUrl the Bot API's base URL, e.g. {@code https://api.telegram.org}
@@ -61,14 +57,12 @@ public final class TelegramAlertSender implements IAlertSender {
      * @param chatId     the channel alerts are posted to: its numeric id ({@code -100…})
      *                   or {@code @username} for a public channel; must not be blank
      * @param timeout    the most one request may take to connect and complete; must be positive
-     * @param zone       the time zone alert times are shown in
      */
-    public TelegramAlertSender(String apiBaseUrl, String botToken, String chatId, Duration timeout, ZoneId zone) {
+    public TelegramAlertSender(String apiBaseUrl, String botToken, String chatId, Duration timeout) {
         Objects.requireNonNull(apiBaseUrl, "apiBaseUrl");
         Objects.requireNonNull(botToken, "botToken");
         this.chatId = Objects.requireNonNull(chatId, "chatId");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
-        this.zone = Objects.requireNonNull(zone, "zone");
         if (apiBaseUrl.isBlank()) {
             throw new IllegalArgumentException("apiBaseUrl must not be blank");
         }
@@ -84,7 +78,7 @@ public final class TelegramAlertSender implements IAlertSender {
         String base = apiBaseUrl.endsWith("/") ? apiBaseUrl.substring(0, apiBaseUrl.length() - 1) : apiBaseUrl;
         this.sendMessageUri = URI.create(base + "/bot" + botToken + "/" + SEND_MESSAGE_METHOD);
         this.httpClient = HttpClient.newBuilder().connectTimeout(timeout).build();
-        logger.info("posting alerts to Telegram channel {} (times shown in {})", chatId, zone);
+        logger.info("posting alerts to Telegram channel {}", chatId);
     }
 
     @Override
@@ -119,11 +113,12 @@ public final class TelegramAlertSender implements IAlertSender {
 
     /** The message people read; see the class comment for its shape. */
     String toText(PollutionAlert alert) {
-        return "🚨 " + alert.pollutant().displayName() + " alert - " + alert.city() + "\n"
-                + "High " + describeMeasurement(alert.window()) + "\n"
-                + formatValue(alert.measuredValue()) + " " + alert.pollutant().unit()
-                + " (exceeds " + formatValue(alert.threshold()) + ")\n"
-                + TIME_FORMAT.format(alert.timestamp().atZone(zone));
+        String unit = alert.pollutant().unit();
+        return "🚨 " + alert.pollutant().displayName() + " alert\n"
+                + "Sensor: " + alert.city() + "\n"
+                + "Cause: High " + describeMeasurement(alert.window()) + "\n"
+                + "Value: " + formatValue(alert.measuredValue()) + " " + unit + "\n"
+                + "Threshold: " + formatValue(alert.threshold()) + " " + unit;
     }
 
     /** {@code "single reading"}, {@code "10-minute average"}, {@code "24-hour average"}. */

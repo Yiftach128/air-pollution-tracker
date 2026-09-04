@@ -69,8 +69,7 @@ public final class Wiring {
                     Config.getTelegramApiBaseUrl(),
                     Config.getTelegramBotToken(),
                     Config.getTelegramChatId(),
-                    Config.getTelegramTimeout(),
-                    Config.getAlertTimeZone());
+                    Config.getTelegramTimeout());
         }
         return new LoggingAlertSender();
     }
