@@ -1,32 +1,72 @@
 <configuration>
     <property name="APP_NAME" value="${app.name:-app}"/>
 
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+    <!-- Where the JSON lines go, by LOG_FORMAT:
+           text (the default) - a readable pattern on the console plus the JSON file
+                                below, for a machine running the services as processes;
+           json               - the JSON lines on stdout and no file, for a container
+                                platform, which collects stdout and would not keep a
+                                file (and whose replicas must not share one).
+         LOG_FORMAT is read from the process environment by logback itself, not
+         through Env: logback configures itself while the first logger is created,
+         before Env, whose own class initialization logs, can run. -->
+    <property name="LOG_FORMAT" value="${LOG_FORMAT:-text}"/>
 
-    <!-- One JSON object per line, tailed by Grafana Alloy into Loki. The file is
-         named after the service (each Application sets app.name before logback
-         starts) so Alloy can label every line with the service it came from.
-         UNIX line endings keep the files identical on Windows and Linux; the
-         timestamp field is renamed so it is a plain LogQL/JMESPath identifier. -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/${APP_NAME}.json</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/${APP_NAME}.%d{yyyy-MM-dd}.json</fileNamePattern>
-            <maxHistory>7</maxHistory>
-        </rollingPolicy>
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <lineSeparator>UNIX</lineSeparator>
-            <fieldNames>
-                <timestamp>timestamp</timestamp>
-                <version>[ignore]</version>
-                <levelValue>[ignore]</levelValue>
-            </fieldNames>
-        </encoder>
-    </appender>
+    <if condition='property("LOG_FORMAT").equals("json")'>
+        <then>
+            <!-- The same JSON as the file below, plus the service name in every line:
+                 on a platform there is no file name to take it from. -->
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <lineSeparator>UNIX</lineSeparator>
+                    <customFields>{"service":"${APP_NAME}"}</customFields>
+                    <fieldNames>
+                        <timestamp>timestamp</timestamp>
+                        <version>[ignore]</version>
+                        <levelValue>[ignore]</levelValue>
+                    </fieldNames>
+                </encoder>
+            </appender>
+
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+            </root>
+        </then>
+        <else>
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <encoder>
+                    <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+                </encoder>
+            </appender>
+
+            <!-- One JSON object per line, tailed by Grafana Alloy into Loki. The file is
+                 named after the service (each Application sets app.name before logback
+                 starts) so Alloy can label every line with the service it came from.
+                 UNIX line endings keep the files identical on Windows and Linux; the
+                 timestamp field is renamed so it is a plain LogQL/JMESPath identifier. -->
+            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>logs/${APP_NAME}.json</file>
+                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                    <fileNamePattern>logs/${APP_NAME}.%d{yyyy-MM-dd}.json</fileNamePattern>
+                    <maxHistory>7</maxHistory>
+                </rollingPolicy>
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <lineSeparator>UNIX</lineSeparator>
+                    <customFields>{"service":"${APP_NAME}"}</customFields>
+                    <fieldNames>
+                        <timestamp>timestamp</timestamp>
+                        <version>[ignore]</version>
+                        <levelValue>[ignore]</levelValue>
+                    </fieldNames>
+                </encoder>
+            </appender>
+
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+                <appender-ref ref="FILE"/>
+            </root>
+        </else>
+    </if>
 
     <!-- The Kafka clients narrate their whole configuration and every broker
          hiccup at INFO; only their warnings are worth keeping. -->
@@ -36,9 +76,4 @@
          project expects (a reading already stored, a database that is down) are handled and logged
          by the code that catches them, so the duplicate lines are noise. -->
     <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
-
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </root>
 </configuration>

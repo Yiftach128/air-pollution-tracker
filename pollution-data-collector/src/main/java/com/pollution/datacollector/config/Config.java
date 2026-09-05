@@ -4,9 +4,7 @@ import com.pollution.common.config.Env;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
 import java.net.URI;
 import java.time.Duration;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * The collector's settings. Values only; see {@link Wiring} for how the
@@ -30,6 +28,19 @@ public final class Config {
      */
     private static final List<String> DEFAULT_PURPLEAIR_API_KEYS = List.of(
             "DCCF8399-9D98-11F1-9E30-4201AC1DC129"
+    );
+
+    /**
+     * The sensors this instance follows, each as {@code <sensorIndex>=<city>}
+     * (see {@link PurpleAirSensor#parse}). Overridden by the
+     * {@code PURPLEAIR_SENSORS} env var (comma-separated) when set — which is
+     * how several collectors share the sensors out: every instance gets its
+     * own list, and the lists must not overlap, or a sensor is polled,
+     * stored and averaged twice.
+     */
+    private static final List<String> DEFAULT_PURPLEAIR_SENSORS = List.of(
+            "308702=Ganei Ayalon",
+            "298123=Shoham"
     );
 
     /** How often PurpleAir is asked for fresh readings; each poll costs API points per sensor. */
@@ -59,8 +70,14 @@ public final class Config {
         return Env.getList("PURPLEAIR_API_KEYS", DEFAULT_PURPLEAIR_API_KEYS);
     }
 
-    /** The sensors to poll: every entry of {@link PurpleAirSensor}. */
-    public static Set<PurpleAirSensor> getSensors() {
-        return EnumSet.allOf(PurpleAirSensor.class);
+    /**
+     * The sensors to poll, in configured order.
+     *
+     * @throws IllegalArgumentException if an entry of {@code PURPLEAIR_SENSORS} is malformed
+     */
+    public static List<PurpleAirSensor> getSensors() {
+        return Env.getList("PURPLEAIR_SENSORS", DEFAULT_PURPLEAIR_SENSORS).stream()
+                .map(PurpleAirSensor::parse)
+                .toList();
     }
 }

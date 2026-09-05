@@ -2,6 +2,7 @@ package com.pollution.datacollector;
 
 import com.pollution.common.PollutionLogger;
 import com.pollution.common.entities.PollutionData;
+import com.pollution.common.health.IHealthServer;
 import com.pollution.common.pubsub.IPublisher;
 import com.pollution.datacollector.config.Config;
 import com.pollution.datacollector.config.Wiring;
@@ -22,14 +23,25 @@ public class DataCollectorApplication {
 
     public static void main(String[] args) {
         logger.info("{} starting", Config.SERVICE_NAME);
-        IReadingsFetcher readingsFetcher = Wiring.createReadingsFetcher();
-        IPublisher<PollutionData> pollutionPublisher = Wiring.createPollutionPublisher();
-        PollutionDataCollectorService service = Wiring.createCollectorService(readingsFetcher, pollutionPublisher);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            service.close();
-            pollutionPublisher.close();
-        }, "collector-shutdown"));
-        service.start();
+        IHealthServer health = Wiring.createHealthServer();
+        health.start();
+        try {
+            IReadingsFetcher readingsFetcher = Wiring.createReadingsFetcher();
+            IPublisher<PollutionData> pollutionPublisher = Wiring.createPollutionPublisher();
+            PollutionDataCollectorService service = Wiring.createCollectorService(readingsFetcher, pollutionPublisher);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                health.markNotReady();
+                service.close();
+                pollutionPublisher.close();
+                health.close();
+            }, "collector-shutdown"));
+            service.start();
+        } catch (RuntimeException e) {
+            // a failed start must end the process, not leave it alive and never ready
+            health.close();
+            throw e;
+        }
+        health.markReady();
         logger.info("{} scheduled and running", Config.SERVICE_NAME);
     }
 }

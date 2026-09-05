@@ -22,7 +22,7 @@ import org.slf4j.Logger;
  * <p>
  * {@link #initialize()} enriches the registry with each sensor's PurpleAir metadata,
  * which supplies the reading's {@code source} name. A sensor that could not be
- * enriched still produces readings (named after its enum constant) and is
+ * enriched still produces readings (named after its sensor index) and is
  * retried on the next cycle.
  * <p>
  * Every {@code source} is a {@link SourceId} of provider {@value #PROVIDER}
@@ -72,7 +72,7 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
         String name = sensorRegistry.get(sensor)
                 .or(() -> retryEnrichment(sensor))
                 .map(PurpleAirSensorInfo::name)
-                .orElse(sensor.name());
+                .orElse(String.valueOf(sensor.sensorIndex()));
         return new SourceId(PROVIDER, name).toString();
     }
 
@@ -80,7 +80,7 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
         try {
             return Optional.of(sensorRegistry.enrichSensor(sensor));
         } catch (PurpleAirApiException e) {
-            logger.warn("sensor {} still not enriched ({}); using its enum name as source",
+            logger.warn("sensor {} still not enriched ({}); using its sensor index as source",
                     sensor, e.getMessage());
             return Optional.empty();
         }

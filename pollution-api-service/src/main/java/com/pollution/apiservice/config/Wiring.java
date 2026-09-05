@@ -1,5 +1,6 @@
 package com.pollution.apiservice.config;
 
+import static com.pollution.common.config.Config.getHealthPort;
 import static com.pollution.persistence.config.Config.getLatestReadingTtl;
 import static com.pollution.persistence.postgres.config.Config.getPostgresJdbcUrl;
 import static com.pollution.persistence.postgres.config.Config.getPostgresPassword;
@@ -20,6 +21,9 @@ import com.pollution.apiservice.web.SourcesHandler;
 import com.pollution.apiservice.web.StaticResourceHandler;
 import com.pollution.apiservice.web.jdk.JdkWebServer;
 import com.pollution.common.entities.PollutionData;
+import com.pollution.common.health.IHealthServer;
+import com.pollution.common.health.NoopHealthServer;
+import com.pollution.common.health.jdk.JdkHealthServer;
 import com.pollution.persistence.CacheBackedLatestReadingStore;
 import com.pollution.persistence.ILatestReadingStore;
 import com.pollution.persistence.IPollutionCache;
@@ -36,6 +40,15 @@ import com.pollution.persistence.redis.RedisPollutionCache;
 public final class Wiring {
 
     private Wiring() {
+    }
+
+    /**
+     * The answers to a container platform's probes: a real server when
+     * {@code HEALTH_PORT} is set, else nothing. On its own port, like every
+     * other service's, not on the dashboard's.
+     */
+    public static IHealthServer createHealthServer() {
+        return getHealthPort().isPresent() ? new JdkHealthServer(getHealthPort().getAsInt()) : new NoopHealthServer();
     }
 
     /** The history of every source; connects on creation. */

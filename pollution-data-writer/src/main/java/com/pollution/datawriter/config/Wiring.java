@@ -3,6 +3,7 @@ package com.pollution.datawriter.config;
 import static com.pollution.common.config.Config.POLLUTION_ALERT_TOPIC;
 import static com.pollution.common.config.Config.POLLUTION_AVERAGE_TOPIC;
 import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
+import static com.pollution.common.config.Config.getHealthPort;
 import static com.pollution.persistence.config.Config.getLatestReadingTtl;
 import static com.pollution.persistence.postgres.config.Config.getPostgresJdbcUrl;
 import static com.pollution.persistence.postgres.config.Config.getPostgresPassword;
@@ -14,6 +15,9 @@ import static com.pollution.persistence.redis.config.Config.getRedisPort;
 import com.pollution.common.entities.PollutionAlert;
 import com.pollution.common.entities.PollutionAverage;
 import com.pollution.common.entities.PollutionData;
+import com.pollution.common.health.IHealthServer;
+import com.pollution.common.health.NoopHealthServer;
+import com.pollution.common.health.jdk.JdkHealthServer;
 import com.pollution.common.pubsub.ISubscriber;
 import com.pollution.common.pubsub.kafka.JsonDeserializer;
 import com.pollution.common.pubsub.kafka.KafkaSubscriber;
@@ -33,6 +37,11 @@ import com.pollution.persistence.redis.RedisPollutionCache;
 public final class Wiring {
 
     private Wiring() {
+    }
+
+    /** The answers to a container platform's probes: a real server when {@code HEALTH_PORT} is set, else nothing. */
+    public static IHealthServer createHealthServer() {
+        return getHealthPort().isPresent() ? new JdkHealthServer(getHealthPort().getAsInt()) : new NoopHealthServer();
     }
 
     public static ISubscriber<PollutionData> createPollutionSubscriber() {

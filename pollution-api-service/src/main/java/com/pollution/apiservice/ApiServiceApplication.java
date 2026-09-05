@@ -4,6 +4,7 @@ import com.pollution.apiservice.config.Config;
 import com.pollution.apiservice.config.Wiring;
 import com.pollution.apiservice.web.IWebServer;
 import com.pollution.common.PollutionLogger;
+import com.pollution.common.health.IHealthServer;
 import com.pollution.persistence.ILatestReadingStore;
 import com.pollution.persistence.IPollutionRepository;
 import org.slf4j.Logger;
@@ -22,15 +23,26 @@ public class ApiServiceApplication {
 
     public static void main(String[] args) {
         logger.info("{} starting", Config.SERVICE_NAME);
-        IPollutionRepository repository = Wiring.createPollutionRepository();
-        ILatestReadingStore latestReadings = Wiring.createLatestReadingStore();
-        IWebServer server = Wiring.createWebServer(repository, latestReadings);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            server.close();
-            latestReadings.close();
-            repository.close();
-        }, "api-shutdown"));
-        server.start();
+        IHealthServer health = Wiring.createHealthServer();
+        health.start();
+        try {
+            IPollutionRepository repository = Wiring.createPollutionRepository();
+            ILatestReadingStore latestReadings = Wiring.createLatestReadingStore();
+            IWebServer server = Wiring.createWebServer(repository, latestReadings);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                health.markNotReady();
+                server.close();
+                latestReadings.close();
+                repository.close();
+                health.close();
+            }, "api-shutdown"));
+            server.start();
+        } catch (RuntimeException e) {
+            // a failed start must end the process, not leave it alive and never ready
+            health.close();
+            throw e;
+        }
+        health.markReady();
         logger.info("{} serving the dashboard at http://{}:{}/", Config.SERVICE_NAME, Config.getBindAddress(), Config.getPort());
     }
 }

@@ -1,8 +1,12 @@
 package com.pollution.datacollector.config;
 
 import static com.pollution.common.config.Config.POLLUTION_DATA_TOPIC;
+import static com.pollution.common.config.Config.getHealthPort;
 
 import com.pollution.common.entities.PollutionData;
+import com.pollution.common.health.IHealthServer;
+import com.pollution.common.health.NoopHealthServer;
+import com.pollution.common.health.jdk.JdkHealthServer;
 import com.pollution.common.pubsub.IPublisher;
 import com.pollution.common.pubsub.kafka.JsonSerializer;
 import com.pollution.common.pubsub.kafka.KafkaPublisher;
@@ -29,6 +33,11 @@ import java.util.concurrent.ScheduledExecutorService;
 public final class Wiring {
 
     private Wiring() {
+    }
+
+    /** The answers to a container platform's probes: a real server when {@code HEALTH_PORT} is set, else nothing. */
+    public static IHealthServer createHealthServer() {
+        return getHealthPort().isPresent() ? new JdkHealthServer(getHealthPort().getAsInt()) : new NoopHealthServer();
     }
 
     public static IReadingsFetcher createReadingsFetcher() {

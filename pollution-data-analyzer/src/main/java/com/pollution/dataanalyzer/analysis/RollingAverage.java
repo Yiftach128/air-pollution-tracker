@@ -21,10 +21,14 @@ import org.slf4j.Logger;
  * seen so far, so the buffer only ever holds the current window. A running
  * sum keeps the average O(1) to compute.
  * <p>
- * Readings are expected to arrive roughly in timestamp order. A reading that
- * arrives already outside the window is dropped; one that arrives late but
- * still inside the window is kept, and may linger slightly past its expiry
- * because eviction only inspects the head of the queue.
+ * A series' readings arrive in timestamp order — the collector steps every
+ * republish of a reading forward, and the messaging keeps a series on one
+ * partition — so a reading that is not newer than the newest one seen is a
+ * repeat, not a late arrival: a redelivery after a crash or rebalance, or a
+ * collector that restarted (or re-polled an unchanged sensor) and emits the
+ * same timestamps again. Such a reading is ignored, so it is counted once
+ * whatever the messaging's delivery guarantees, just as the writer's
+ * repository stores it once.
  * <p>
  * Invariant: the reading carrying the newest timestamp is never evicted (it
  * cannot be before its own cutoff), so the buffer is empty exactly when no
@@ -82,7 +86,8 @@ public class RollingAverage {
         }
         restored.latest = state.latest();
         for (Reading reading : state.readings()) {
-            restored.addReading(reading.timestamp(), reading.value());
+            // the persisted readings all precede the persisted latest: append, do not treat them as repeats
+            restored.append(reading.timestamp(), reading.value());
         }
         logger.debug("{}: {} window restored {} of {} readings, latest {}",
                 state.sensorPollutant(), configuredWindow, restored.size(), state.sampleCount(), restored.latest);
@@ -92,13 +97,23 @@ public class RollingAverage {
     /**
      * Appends a reading to the window and drops every reading that has fallen
      * out of it, i.e. is older than {@code latest - window} where {@code latest}
-     * is the newest timestamp seen so far. A reading that is itself already
-     * older than that cutoff is ignored.
+     * is the newest timestamp seen so far. A reading that is not newer than
+     * {@code latest} is a repeat (see the class comment) and is ignored, as is
+     * one already older than the cutoff.
      *
      * @return whether the reading was accepted, i.e. whether the state changed
      */
     public boolean addReading(Instant timestamp, double value) {
         Objects.requireNonNull(timestamp, "timestamp");
+        if (latest != null && !timestamp.isAfter(latest)) {
+            logger.debug("{}: {} window ignoring repeated reading at {}, newest is {}", sensorPollutant, window, timestamp, latest);
+            return false;
+        }
+        return append(timestamp, value);
+    }
+
+    /** {@link #addReading} without the repeat check; restoring replays persisted readings through it. */
+    private boolean append(Instant timestamp, double value) {
         if (latest == null || timestamp.isAfter(latest)) {
             latest = timestamp;
         }

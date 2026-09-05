@@ -7,14 +7,20 @@ import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensorInfo;
 import com.pollution.datacollector.registry.ISensorRegistry;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 
 /**
  * In-memory {@link ISensorRegistry} backed by a {@link PurpleAirSensorApi}.
+ * The sensors it follows are given to it — they are this instance's share
+ * when several collectors split the sensors — and logged once at
+ * construction, so each instance's log says which sensors it owns.
  */
 public class PurpleAirSensorRegistry implements ISensorRegistry<PurpleAirSensor, PurpleAirSensorInfo> {
 
@@ -24,9 +30,22 @@ public class PurpleAirSensorRegistry implements ISensorRegistry<PurpleAirSensor,
     private final List<PurpleAirSensor> sensors;
     private final Map<PurpleAirSensor, PurpleAirSensorInfo> infoBySensor = new ConcurrentHashMap<>();
 
+    /**
+     * @param sensors the sensors to follow; at least one, no sensor index twice
+     */
     public PurpleAirSensorRegistry(PurpleAirSensorApi sensorApi, Collection<PurpleAirSensor> sensors) {
-        this.sensorApi = sensorApi;
-        this.sensors = List.copyOf(sensors);
+        this.sensorApi = Objects.requireNonNull(sensorApi, "sensorApi");
+        this.sensors = List.copyOf(Objects.requireNonNull(sensors, "sensors"));
+        if (this.sensors.isEmpty()) {
+            throw new IllegalArgumentException("at least one sensor is required");
+        }
+        Set<Integer> indexes = new HashSet<>();
+        for (PurpleAirSensor sensor : this.sensors) {
+            if (!indexes.add(sensor.sensorIndex())) {
+                throw new IllegalArgumentException("sensor index " + sensor.sensorIndex() + " is listed more than once");
+            }
+        }
+        logger.info("following {} sensor(s): {}", this.sensors.size(), this.sensors);
     }
 
     @Override
