@@ -13,6 +13,7 @@ import com.pollution.common.pubsub.kafka.KafkaPublisher;
 import com.pollution.datacollector.PollutionDataCollectorService;
 import com.pollution.datacollector.api.IApiKeyProvider;
 import com.pollution.datacollector.api.RoundRobinApiKeyProvider;
+import com.pollution.datacollector.api.purpleair.IPurpleAirSensorApi;
 import com.pollution.datacollector.api.purpleair.PurpleAirSensorApi;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensorInfo;
@@ -45,7 +46,7 @@ public final class Wiring {
                 .connectTimeout(Config.PURPLEAIR_CONNECT_TIMEOUT)
                 .build();
         IApiKeyProvider apiKeys = new RoundRobinApiKeyProvider(Config.getPurpleAirApiKeys());
-        PurpleAirSensorApi sensorApi = new PurpleAirSensorApi(
+        IPurpleAirSensorApi sensorApi = new PurpleAirSensorApi(
                 http, Config.PURPLEAIR_BASE_URI, apiKeys, Config.PURPLEAIR_REQUEST_TIMEOUT);
         ISensorRegistry<PurpleAirSensor, PurpleAirSensorInfo> sensorRegistry =
                 new PurpleAirSensorRegistry(sensorApi, Config.getSensors());

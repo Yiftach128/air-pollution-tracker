@@ -2,7 +2,7 @@ package com.pollution.datacollector.registry.purpleair;
 
 import com.pollution.common.PollutionLogger;
 import com.pollution.datacollector.api.purpleair.PurpleAirApiException;
-import com.pollution.datacollector.api.purpleair.PurpleAirSensorApi;
+import com.pollution.datacollector.api.purpleair.IPurpleAirSensorApi;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensorInfo;
 import com.pollution.datacollector.registry.ISensorRegistry;
@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 
 /**
- * In-memory {@link ISensorRegistry} backed by a {@link PurpleAirSensorApi}.
+ * In-memory {@link ISensorRegistry} backed by a {@link IPurpleAirSensorApi}.
  * The sensors it follows are given to it — they are this instance's share
  * when several collectors split the sensors — and logged once at
  * construction, so each instance's log says which sensors it owns.
@@ -26,14 +26,14 @@ public class PurpleAirSensorRegistry implements ISensorRegistry<PurpleAirSensor,
 
     private static final Logger logger = PollutionLogger.getLogger(PurpleAirSensorRegistry.class);
 
-    private final PurpleAirSensorApi sensorApi;
+    private final IPurpleAirSensorApi sensorApi;
     private final List<PurpleAirSensor> sensors;
     private final Map<PurpleAirSensor, PurpleAirSensorInfo> infoBySensor = new ConcurrentHashMap<>();
 
     /**
      * @param sensors the sensors to follow; at least one, no sensor index twice
      */
-    public PurpleAirSensorRegistry(PurpleAirSensorApi sensorApi, Collection<PurpleAirSensor> sensors) {
+    public PurpleAirSensorRegistry(IPurpleAirSensorApi sensorApi, Collection<PurpleAirSensor> sensors) {
         this.sensorApi = Objects.requireNonNull(sensorApi, "sensorApi");
         this.sensors = List.copyOf(Objects.requireNonNull(sensors, "sensors"));
         if (this.sensors.isEmpty()) {

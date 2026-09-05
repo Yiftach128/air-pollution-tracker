@@ -5,7 +5,7 @@ import com.pollution.common.entities.Pollutant;
 import com.pollution.common.entities.PollutionData;
 import com.pollution.common.entities.SourceId;
 import com.pollution.datacollector.api.purpleair.PurpleAirApiException;
-import com.pollution.datacollector.api.purpleair.PurpleAirSensorApi;
+import com.pollution.datacollector.api.purpleair.IPurpleAirSensorApi;
 import com.pollution.datacollector.entities.purpleair.PurpleAirReading;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensorInfo;
@@ -17,7 +17,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 
 /**
- * Reads every sensor in the {@link ISensorRegistry} through a {@link PurpleAirSensorApi}
+ * Reads every sensor in the {@link ISensorRegistry} through a {@link IPurpleAirSensorApi}
  * and maps the readings to {@link PollutionData}.
  * <p>
  * {@link #initialize()} enriches the registry with each sensor's PurpleAir metadata,
@@ -35,10 +35,10 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
     /** The provider of every source this fetcher produces, see {@link PollutionData#source()}. */
     static final String PROVIDER = "purpleair";
 
-    private final PurpleAirSensorApi sensorApi;
+    private final IPurpleAirSensorApi sensorApi;
     private final ISensorRegistry<PurpleAirSensor, PurpleAirSensorInfo> sensorRegistry;
 
-    public PurpleAirReadingsFetcher(PurpleAirSensorApi sensorApi,
+    public PurpleAirReadingsFetcher(IPurpleAirSensorApi sensorApi,
                                     ISensorRegistry<PurpleAirSensor, PurpleAirSensorInfo> sensorRegistry) {
         this.sensorApi = sensorApi;
         this.sensorRegistry = sensorRegistry;

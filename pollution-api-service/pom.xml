@@ -38,5 +38,12 @@
             <version>${project.version}</version>
         </dependency>
         <!-- the HTTP server is the JDK's own (module jdk.httpserver); no dependency needed -->
+        <dependency>
+            <groupId>com.pollution</groupId>
+            <artifactId>pollution-common</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

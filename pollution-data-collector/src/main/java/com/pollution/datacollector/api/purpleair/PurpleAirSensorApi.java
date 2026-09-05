@@ -25,7 +25,7 @@ import org.slf4j.Logger;
  * with the next key before giving up, so one exhausted account does not stop
  * collection while others still have points.
  */
-public class PurpleAirSensorApi {
+public class PurpleAirSensorApi implements IPurpleAirSensorApi {
 
     private static final Logger logger = PollutionLogger.getLogger(PurpleAirSensorApi.class);
 
@@ -54,6 +54,7 @@ public class PurpleAirSensorApi {
      *
      * @throws PurpleAirApiException if every key was rejected, or the request failed for another reason
      */
+    @Override
     public PurpleAirReading fetchPm25(int sensorIndex) {
         return getSensor(sensorIndex, READING_FIELDS, sensor -> new PurpleAirReading(
                 requireNumber(sensor, "pm2.5", sensorIndex).asDouble(),
@@ -65,6 +66,7 @@ public class PurpleAirSensorApi {
      *
      * @throws PurpleAirApiException if every key was rejected, or the request failed for another reason
      */
+    @Override
     public PurpleAirSensorInfo fetchSensorInfo(int sensorIndex) {
         return getSensor(sensorIndex, INFO_FIELDS, sensor -> new PurpleAirSensorInfo(
                 sensorIndex,

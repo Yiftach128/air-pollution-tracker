@@ -38,6 +38,9 @@
         <hibernate.version>6.6.4.Final</hibernate.version>
         <hikaricp.version>5.1.0</hikaricp.version>
         <postgresql.version>42.7.4</postgresql.version>
+        <junit.version>5.11.4</junit.version>
+        <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+        <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -108,8 +111,23 @@
                 <artifactId>janino</artifactId>
                 <version>${janino.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <dependencies>
+        <!-- every module has unit tests under src/test/java; see the testing rules in CLAUDE.md -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <pluginManagement>
@@ -123,6 +141,19 @@
                              of the immutable messages in pollution-common relies on them -->
                         <parameters>true</parameters>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <!-- runs the JUnit 5 tests; older defaults of Maven's super-POM do not know JUnit 5 -->
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <!-- pollution-common and persistence-common also package their test support
+                         (fakes of their own interfaces) as test-jars for the services' tests -->
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven-jar-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

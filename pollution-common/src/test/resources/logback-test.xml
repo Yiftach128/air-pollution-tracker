@@ -1,0 +1,17 @@
+<configuration>
+    <!-- The tests' logging: logback prefers logback-test.xml over the shared logback.xml,
+         and this file travels in pollution-common's test-jar, so every module's tests use
+         it. Console only - no logs/<service>.json under a module directory - and only the
+         project's own lines at INFO; libraries speak up at WARN. -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="com.pollution" level="INFO"/>
+</configuration>
