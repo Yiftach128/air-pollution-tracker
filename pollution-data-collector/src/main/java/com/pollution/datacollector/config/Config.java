@@ -18,9 +18,33 @@ public final class Config {
     public static final Duration PURPLEAIR_CONNECT_TIMEOUT = Duration.ofSeconds(10);
     public static final Duration PURPLEAIR_REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
-    /** Thread names of the two collector loops, as they appear in logs. */
+    /** Thread names of the collector's loops, as they appear in logs. */
     public static final String POLL_THREAD_NAME = "purpleair-poll";
     public static final String PUBLISH_THREAD_NAME = "kafka-publish";
+    public static final String MEMBERSHIP_THREAD_NAME = "group-membership";
+
+    /**
+     * Key prefix of the collector group's registrations in the cache: one
+     * key per running instance, {@code collector:member:<id>}, alive while
+     * its lease is (see {@link #getLease()}).
+     */
+    public static final String MEMBER_KEY_PREFIX = "collector:member:";
+
+    /**
+     * This instance's id in the collector group unless {@code COLLECTOR_ID}
+     * says otherwise: {@code <hostname>-<pid>}. Unique among the processes of
+     * one machine, and the same again when a container restarts — its
+     * hostname (a pod's name) and pid do not change — so the restarted
+     * instance replaces its old registration instead of standing beside it
+     * until the lease runs out. Read once: the id must not change while the
+     * process runs.
+     */
+    private static final String DEFAULT_COLLECTOR_ID =
+            Env.getString("HOSTNAME", Env.getString("COMPUTERNAME", "collector")) + "-" + ProcessHandle.current().pid();
+    /** How often an instance renews its lease and re-reads the group; a change of group shows within about this long. */
+    private static final Duration DEFAULT_HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
+    /** How long a registration outlives its last heartbeat: a crashed instance's sensors go unpolled for about this long. */
+    private static final Duration DEFAULT_LEASE = Duration.ofSeconds(30);
 
     /**
      * PurpleAir read keys, used round-robin so API points are spread across them.
@@ -31,12 +55,12 @@ public final class Config {
     );
 
     /**
-     * The sensors this instance follows, each as {@code <sensorIndex>=<city>}
-     * (see {@link PurpleAirSensor#parse}). Overridden by the
-     * {@code PURPLEAIR_SENSORS} env var (comma-separated) when set — which is
-     * how several collectors share the sensors out: every instance gets its
-     * own list, and the lists must not overlap, or a sensor is polled,
-     * stored and averaged twice.
+     * Every sensor the collectors poll between them, each as
+     * {@code <sensorIndex>=<city>} (see {@link PurpleAirSensor#parse}).
+     * Overridden by the {@code PURPLEAIR_SENSORS} env var (comma-separated)
+     * when set. The same list on every instance: which of them an instance
+     * polls is its {@link com.pollution.datacollector.entities.Shard}, worked
+     * out from the group membership, not configured.
      */
     private static final List<String> DEFAULT_PURPLEAIR_SENSORS = List.of(
             "308702=Ganei Ayalon",
@@ -71,7 +95,7 @@ public final class Config {
     }
 
     /**
-     * The sensors to poll, in configured order.
+     * Every sensor the group polls, in configured order — the same on every instance.
      *
      * @throws IllegalArgumentException if an entry of {@code PURPLEAIR_SENSORS} is malformed
      */
@@ -79,5 +103,19 @@ public final class Config {
         return Env.getList("PURPLEAIR_SENSORS", DEFAULT_PURPLEAIR_SENSORS).stream()
                 .map(PurpleAirSensor::parse)
                 .toList();
+    }
+
+    /** This instance's id in the collector group; see {@link #DEFAULT_COLLECTOR_ID}. */
+    public static String getCollectorId() {
+        return Env.getString("COLLECTOR_ID", DEFAULT_COLLECTOR_ID);
+    }
+
+    public static Duration getHeartbeatInterval() {
+        return Duration.ofMillis(Env.getLong("COLLECTOR_HEARTBEAT_MS", DEFAULT_HEARTBEAT_INTERVAL.toMillis()));
+    }
+
+    /** How long an instance stays in the group without a heartbeat; must be at least two heartbeats. */
+    public static Duration getLease() {
+        return Duration.ofMillis(Env.getLong("COLLECTOR_LEASE_MS", DEFAULT_LEASE.toMillis()));
     }
 }

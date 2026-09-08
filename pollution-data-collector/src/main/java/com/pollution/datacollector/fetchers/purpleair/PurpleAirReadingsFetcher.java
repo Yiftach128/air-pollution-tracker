@@ -4,26 +4,29 @@ import com.pollution.common.PollutionLogger;
 import com.pollution.common.entities.Pollutant;
 import com.pollution.common.entities.PollutionData;
 import com.pollution.common.entities.SourceId;
-import com.pollution.datacollector.api.purpleair.PurpleAirApiException;
 import com.pollution.datacollector.api.purpleair.IPurpleAirSensorApi;
+import com.pollution.datacollector.api.purpleair.PurpleAirApiException;
+import com.pollution.datacollector.entities.Shard;
 import com.pollution.datacollector.entities.purpleair.PurpleAirReading;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensor;
 import com.pollution.datacollector.entities.purpleair.PurpleAirSensorInfo;
 import com.pollution.datacollector.fetchers.IReadingsFetcher;
 import com.pollution.datacollector.registry.ISensorRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 
 /**
- * Reads every sensor in the {@link ISensorRegistry} through a {@link IPurpleAirSensorApi}
- * and maps the readings to {@link PollutionData}.
+ * Reads every sensor the {@link ISensorRegistry} follows through a
+ * {@link IPurpleAirSensorApi} and maps the readings to {@link PollutionData}.
  * <p>
- * {@link #initialize()} enriches the registry with each sensor's PurpleAir metadata,
- * which supplies the reading's {@code source} name. A sensor that could not be
- * enriched still produces readings (named after its sensor index) and is
- * retried on the next cycle.
+ * {@link #follow(Shard)} hands the shard to the registry, which enriches the
+ * sensors gained with their PurpleAir metadata — that supplies the reading's
+ * {@code source} name. A sensor that could not be enriched still produces
+ * readings (named after its sensor index) and is retried on every fetch.
  * <p>
  * Every {@code source} is a {@link SourceId} of provider {@value #PROVIDER}
  * ({@code purpleair:<name>}), so readings from different providers can never
@@ -45,8 +48,17 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
     }
 
     @Override
-    public void initialize() {
-        sensorRegistry.enrichAll();
+    public void follow(Shard shard) {
+        sensorRegistry.follow(shard);
+    }
+
+    @Override
+    public Set<String> sources() {
+        Set<String> sources = new LinkedHashSet<>();
+        for (PurpleAirSensor sensor : sensorRegistry.sensors()) {
+            sources.add(sourceOf(sensor, sensorRegistry.get(sensor)));
+        }
+        return sources;
     }
 
     @Override
@@ -55,7 +67,7 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
         List<PollutionData> readings = new ArrayList<>(sensors.size());
         for (PurpleAirSensor sensor : sensors) {
             try {
-                String source = sourceName(sensor);
+                String source = sourceOf(sensor, sensorRegistry.get(sensor).or(() -> retryEnrichment(sensor)));
                 PurpleAirReading reading = sensorApi.fetchPm25(sensor.sensorIndex());
                 readings.add(new PollutionData(
                         sensor.city(), source, Pollutant.PM2_5, reading.pm25(), reading.lastSeen()));
@@ -67,12 +79,9 @@ public class PurpleAirReadingsFetcher implements IReadingsFetcher {
         return readings;
     }
 
-    /** The {@link SourceId} of the sensor's PurpleAir name, enriching it now if startup enrichment failed. */
-    private String sourceName(PurpleAirSensor sensor) {
-        String name = sensorRegistry.get(sensor)
-                .or(() -> retryEnrichment(sensor))
-                .map(PurpleAirSensorInfo::name)
-                .orElse(String.valueOf(sensor.sensorIndex()));
+    /** The {@link SourceId} of the sensor's PurpleAir name, or of its sensor index while it has none. */
+    private static String sourceOf(PurpleAirSensor sensor, Optional<PurpleAirSensorInfo> info) {
+        String name = info.map(PurpleAirSensorInfo::name).orElse(String.valueOf(sensor.sensorIndex()));
         return new SourceId(PROVIDER, name).toString();
     }
 

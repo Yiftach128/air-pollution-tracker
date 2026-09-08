@@ -3,12 +3,15 @@ package com.pollution.datacollector;
 import com.pollution.common.PollutionLogger;
 import com.pollution.common.entities.PollutionData;
 import com.pollution.common.pubsub.IPublisher;
+import com.pollution.datacollector.entities.Shard;
 import com.pollution.datacollector.fetchers.IReadingsFetcher;
+import com.pollution.datacollector.membership.IGroupMembership;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -19,13 +22,22 @@ import org.slf4j.Logger;
  * Runs two periodic tasks, each on its own thread so a slow poll never delays publishing:
  * <ul>
  *   <li><b>poll</b> — every {@link Schedule#pollInterval()}, fetches the latest
- *       reading of every sensor from the readings fetcher into an in-memory cache;</li>
+ *       reading of every followed sensor from the readings fetcher into an
+ *       in-memory cache;</li>
  *   <li><b>publish</b> — every {@link Schedule#publishInterval()}, publishes every
  *       cached reading, so downstream sees a steady stream of readings between
  *       polls. The k-th publish of a reading is stamped {@code last_seen + k *
  *       publishInterval}: the first copy carries the sensor's own timestamp and
  *       each later copy steps forward by one publish interval.</li>
  * </ul>
+ * Which sensors are followed is the {@link IGroupMembership}'s to say: it
+ * keeps this instance in the group of running collectors and hands it a
+ * {@link Shard} of the configured sensors, again whenever the group changes.
+ * Each shard is applied on the poll thread — the fetcher follows it, the
+ * cached readings of sensors no longer followed are dropped so they stop
+ * being republished, and the sensors gained are polled at once rather than
+ * at the next scheduled poll.
+ * <p>
  * A cached reading older than {@link Schedule#readingMaxAge()} (i.e. the source
  * has failed to refresh it) is dropped rather than replayed indefinitely.
  */
@@ -64,21 +76,26 @@ public class PollutionDataCollectorService implements AutoCloseable {
 
     private final IReadingsFetcher readingsFetcher;
     private final IPublisher<PollutionData> pollutionPublisher;
+    private final IGroupMembership membership;
     private final ScheduledExecutorService pollScheduler;
     private final ScheduledExecutorService publishScheduler;
     private final Schedule schedule;
     private final Clock clock;
     /** Last reading per sensor, keyed by {@link PollutionData#source()}. */
     private final ConcurrentMap<String, CachedReading> latestReadings = new ConcurrentHashMap<>();
+    /** Whether the current shard gives this instance any sensor at all; nothing is polled or missed while it does not. */
+    private volatile boolean followingSensors;
 
     public PollutionDataCollectorService(IReadingsFetcher readingsFetcher,
                                          IPublisher<PollutionData> pollutionPublisher,
+                                         IGroupMembership membership,
                                          ScheduledExecutorService pollScheduler,
                                          ScheduledExecutorService publishScheduler,
                                          Schedule schedule,
                                          Clock clock) {
         this.readingsFetcher = readingsFetcher;
         this.pollutionPublisher = pollutionPublisher;
+        this.membership = membership;
         this.pollScheduler = pollScheduler;
         this.publishScheduler = publishScheduler;
         this.schedule = schedule;
@@ -86,11 +103,11 @@ public class PollutionDataCollectorService implements AutoCloseable {
     }
 
     public void start() {
-        readingsFetcher.initialize();
         long pollMillis = schedule.pollInterval().toMillis();
         long publishMillis = schedule.publishInterval().toMillis();
         pollScheduler.scheduleAtFixedRate(guarded("poll", this::poll), 0, pollMillis, TimeUnit.MILLISECONDS);
         publishScheduler.scheduleAtFixedRate(guarded("publish", this::publish), publishMillis, publishMillis, TimeUnit.MILLISECONDS);
+        membership.start(this::onShardChanged);
         logger.info("polling every {} ms, publishing every {} ms, dropping readings older than {} ms",
                 pollMillis, publishMillis, schedule.readingMaxAge().toMillis());
     }
@@ -106,7 +123,38 @@ public class PollutionDataCollectorService implements AutoCloseable {
         };
     }
 
+    /**
+     * Called on the membership's thread. The shard is applied on the poll
+     * thread, where the sensors are read, so a poll never runs against a
+     * half-changed share and the cache is not touched by two threads.
+     */
+    private void onShardChanged(Shard shard) {
+        pollScheduler.execute(guarded("reshard", () -> reshard(shard)));
+    }
+
+    private void reshard(Shard shard) {
+        readingsFetcher.follow(shard);
+        Set<String> sources = readingsFetcher.sources();
+        followingSensors = !sources.isEmpty();
+        latestReadings.keySet().removeIf(source -> {
+            if (sources.contains(source)) {
+                return false;
+            }
+            logger.info("no longer following {}: dropping its cached reading", source);
+            return true;
+        });
+        if (followingSensors) {
+            poll(); // the sensors gained are polled now, not at the next scheduled poll
+        } else {
+            logger.info("shard {}: no sensors to poll", shard);
+        }
+    }
+
     private void poll() {
+        if (!followingSensors) {
+            logger.debug("no sensors followed; nothing to poll");
+            return;
+        }
         List<PollutionData> readings = readingsFetcher.fetch();
         Instant now = clock.instant();
         for (PollutionData reading : readings) {
@@ -139,7 +187,7 @@ public class PollutionDataCollectorService implements AutoCloseable {
             logger.info("published {}", message);
             published++;
         }
-        if (published == 0) {
+        if (published == 0 && followingSensors) {
             logger.warn("nothing to publish");
         }
     }
@@ -152,6 +200,7 @@ public class PollutionDataCollectorService implements AutoCloseable {
 
     @Override
     public void close() {
+        membership.close(); // leave first, so the others take this instance's sensors at their next heartbeat
         shutdown(pollScheduler);
         shutdown(publishScheduler);
     }

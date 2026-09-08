@@ -7,6 +7,7 @@ import com.pollution.common.pubsub.IPublisher;
 import com.pollution.datacollector.config.Config;
 import com.pollution.datacollector.config.Wiring;
 import com.pollution.datacollector.fetchers.IReadingsFetcher;
+import com.pollution.datacollector.membership.IGroupMembership;
 import org.slf4j.Logger;
 
 public class DataCollectorApplication {
@@ -28,10 +29,12 @@ public class DataCollectorApplication {
         try {
             IReadingsFetcher readingsFetcher = Wiring.createReadingsFetcher();
             IPublisher<PollutionData> pollutionPublisher = Wiring.createPollutionPublisher();
-            PollutionDataCollectorService service = Wiring.createCollectorService(readingsFetcher, pollutionPublisher);
+            IGroupMembership membership = Wiring.createGroupMembership();
+            PollutionDataCollectorService service =
+                    Wiring.createCollectorService(readingsFetcher, pollutionPublisher, membership);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 health.markNotReady();
-                service.close();
+                service.close(); // leaves the group, then stops the loops
                 pollutionPublisher.close();
                 health.close();
             }, "collector-shutdown"));

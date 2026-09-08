@@ -9,6 +9,8 @@ import com.pollution.common.entities.PollutionData;
 import com.pollution.common.testing.MutableClock;
 import com.pollution.common.testing.RecordingPublisher;
 import com.pollution.datacollector.PollutionDataCollectorService.Schedule;
+import com.pollution.datacollector.entities.Shard;
+import com.pollution.datacollector.testing.ManualGroupMembership;
 import com.pollution.datacollector.testing.ManualScheduler;
 import com.pollution.datacollector.testing.StubReadingsFetcher;
 import java.time.Duration;
@@ -17,10 +19,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The collector alone: its two loops are ticked by hand, the readings come
- * from a stub fetcher, and what it publishes — and stamps — is asserted.
- * Polls every five minutes, publishes every ten seconds, drops a reading
- * not refreshed for ten minutes.
+ * The collector alone: its two loops are ticked by hand, the group is
+ * played by the test, the readings come from a stub fetcher, and what it
+ * publishes — and stamps — is asserted. Polls every five minutes, publishes
+ * every ten seconds, drops a reading not refreshed for ten minutes.
  */
 class PollutionDataCollectorServiceTest {
 
@@ -28,17 +30,20 @@ class PollutionDataCollectorServiceTest {
     /** When the sensor took the reading, a little before the collector polled it. */
     private static final Instant SEEN = T0.minusSeconds(40);
     private static final String SOURCE = "purpleair:Ganei-Ayalon";
+    private static final String SHOHAM = "purpleair:Shoham";
     private static final Duration POLL = Duration.ofMinutes(5);
     private static final Duration PUBLISH = Duration.ofSeconds(10);
     private static final Duration MAX_AGE = Duration.ofMinutes(10);
+    private static final Shard ALL = new Shard(0, 1);
 
     private final StubReadingsFetcher fetcher = new StubReadingsFetcher();
     private final RecordingPublisher<PollutionData> publisher = new RecordingPublisher<>();
+    private final ManualGroupMembership membership = new ManualGroupMembership();
     private final ManualScheduler poll = new ManualScheduler();
     private final ManualScheduler publish = new ManualScheduler();
     private final MutableClock clock = MutableClock.at(T0);
     private final PollutionDataCollectorService service = new PollutionDataCollectorService(
-            fetcher, publisher, poll, publish, new Schedule(POLL, PUBLISH, MAX_AGE), clock);
+            fetcher, publisher, membership, poll, publish, new Schedule(POLL, PUBLISH, MAX_AGE), clock);
 
     private static PollutionData reading(String source, double value, Instant seen) {
         return new PollutionData("Ganei Ayalon", source, Pollutant.PM2_5, value, seen);
@@ -48,18 +53,85 @@ class PollutionDataCollectorServiceTest {
         return publisher.messages().stream().map(PollutionData::timestamp).toList();
     }
 
+    private List<String> publishedSources() {
+        return publisher.messages().stream().map(PollutionData::source).toList();
+    }
+
+    /** Starts the service and has the group give it every sensor; the poll that brings finds nothing yet. */
+    private void startFollowingEverySensor() {
+        fetcher.follows(SOURCE, SHOHAM);
+        service.start();
+        membership.assign(ALL);
+    }
+
     @Test
-    void startingInitializesTheFetcherAndSchedulesBothLoops() {
+    void startingSchedulesBothLoopsAndJoinsTheGroup() {
         service.start();
 
-        assertTrue(fetcher.isInitialized());
         assertEquals(List.of(new ManualScheduler.Scheduled(poll.tasks().get(0).task(), Duration.ZERO, POLL)), poll.tasks());
         assertEquals(List.of(new ManualScheduler.Scheduled(publish.tasks().get(0).task(), PUBLISH, PUBLISH)), publish.tasks());
+        assertTrue(membership.isStarted());
+        assertEquals(Shard.NONE, fetcher.shard(), "follows nothing until the group says");
+    }
+
+    @Test
+    void beingGivenAShardFollowsItAndPollsItAtOnce() {
+        fetcher.follows(SOURCE);
+        fetcher.returns(reading(SOURCE, 12.5, SEEN));
+        service.start();
+
+        membership.assign(new Shard(0, 2));
+
+        assertEquals(new Shard(0, 2), fetcher.shard());
+        assertEquals(1, fetcher.fetches(), "polled on assignment, not at the next scheduled poll");
+        publish.runAll();
+        assertEquals(List.of(SOURCE), publishedSources());
+    }
+
+    @Test
+    void nothingIsPolledWhileTheShardHoldsNoSensor() {
+        service.start();
+
+        poll.runAll();
+        membership.assign(new Shard(2, 3));
+        poll.runAll();
+
+        assertEquals(0, fetcher.fetches());
+    }
+
+    @Test
+    void aShardChangeDropsTheCachedReadingsOfSensorsNoLongerFollowed() {
+        startFollowingEverySensor();
+        fetcher.returns(reading(SOURCE, 12.5, SEEN), reading(SHOHAM, 8, SEEN));
+        poll.runAll();
+
+        fetcher.follows(SHOHAM);
+        fetcher.returns(reading(SHOHAM, 8, SEEN));
+        membership.assign(new Shard(1, 2));
+        publish.runAll();
+
+        assertEquals(List.of(SHOHAM), publishedSources(), "the other sensor is someone else's now");
+    }
+
+    @Test
+    void losingTheShardStopsPollingAndPublishing() {
+        startFollowingEverySensor();
+        fetcher.returns(reading(SOURCE, 12.5, SEEN));
+        poll.runAll();
+        int fetches = fetcher.fetches();
+
+        fetcher.follows();
+        membership.assign(Shard.NONE);
+        publish.runAll();
+        poll.runAll();
+
+        assertEquals(List.of(), publisher.sent());
+        assertEquals(fetches, fetcher.fetches());
     }
 
     @Test
     void theFirstPublishCarriesTheSensorsOwnTimestampKeyedBySource() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
 
         poll.runAll();
@@ -70,7 +142,7 @@ class PollutionDataCollectorServiceTest {
 
     @Test
     void everyRepublishStepsTheTimestampForwardByOnePublishInterval() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
         poll.runAll();
 
@@ -83,7 +155,7 @@ class PollutionDataCollectorServiceTest {
 
     @Test
     void aFreshPollStartsTheSteppingOver() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
         poll.runAll();
         publish.runAll();
@@ -96,8 +168,8 @@ class PollutionDataCollectorServiceTest {
     }
 
     @Test
-    void nothingIsPublishedBeforeTheFirstPoll() {
-        service.start();
+    void nothingIsPublishedBeforeTheFirstPollThatFindsAReading() {
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
 
         publish.runAll();
@@ -107,8 +179,8 @@ class PollutionDataCollectorServiceTest {
 
     @Test
     void everyCachedSensorIsPublishedEachTime() {
-        service.start();
-        fetcher.returns(reading(SOURCE, 12.5, SEEN), reading("purpleair:Shoham", 8, SEEN));
+        startFollowingEverySensor();
+        fetcher.returns(reading(SOURCE, 12.5, SEEN), reading(SHOHAM, 8, SEEN));
         poll.runAll();
 
         publish.runAll();
@@ -118,7 +190,7 @@ class PollutionDataCollectorServiceTest {
 
     @Test
     void aReadingNotRefreshedForTheMaxAgeIsDroppedRatherThanReplayedForever() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
         poll.runAll();
 
@@ -138,7 +210,7 @@ class PollutionDataCollectorServiceTest {
 
     @Test
     void anEmptyPollKeepsWhatIsCachedUntilItAges() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
         poll.runAll();
         fetcher.returns();
@@ -151,7 +223,7 @@ class PollutionDataCollectorServiceTest {
 
     @Test
     void aPollThatFailsDoesNotStopTheLoop() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.failWith(new RuntimeException("PurpleAir is down"));
 
         poll.runAll();
@@ -160,13 +232,13 @@ class PollutionDataCollectorServiceTest {
         poll.runAll();
         publish.runAll();
 
-        assertEquals(2, fetcher.fetches());
+        assertEquals(3, fetcher.fetches(), "the poll on assignment, the failed one and the one after");
         assertEquals(1, publisher.sent().size());
     }
 
     @Test
     void aPublishThatFailsDoesNotStopTheLoopNorCountAsPublished() {
-        service.start();
+        startFollowingEverySensor();
         fetcher.returns(reading(SOURCE, 12.5, SEEN));
         poll.runAll();
         publisher.failWith(new RuntimeException("kafka is down"));
@@ -179,11 +251,12 @@ class PollutionDataCollectorServiceTest {
     }
 
     @Test
-    void closingShutsDownBothLoops() {
+    void closingLeavesTheGroupAndShutsDownBothLoops() {
         service.start();
 
         service.close();
 
+        assertTrue(membership.isClosed());
         assertTrue(poll.isShutdown());
         assertTrue(publish.isShutdown());
     }
