@@ -47,14 +47,6 @@ public final class Config {
     private static final Duration DEFAULT_LEASE = Duration.ofSeconds(30);
 
     /**
-     * PurpleAir read keys, used round-robin so API points are spread across them.
-     * Overridden by the {@code PURPLEAIR_API_KEYS} env var (comma-separated) when set.
-     */
-    private static final List<String> DEFAULT_PURPLEAIR_API_KEYS = List.of(
-            "DCCF8399-9D98-11F1-9E30-4201AC1DC129"
-    );
-
-    /**
      * Every sensor the collectors poll between them, each as
      * {@code <sensorIndex>=<city>} (see {@link PurpleAirSensor#parse}).
      * Overridden by the {@code PURPLEAIR_SENSORS} env var (comma-separated)
@@ -90,8 +82,21 @@ public final class Config {
         return Duration.ofMillis(Env.getLong("READING_MAX_AGE_MS", defaultMaxAge.toMillis()));
     }
 
+    /**
+     * The PurpleAir read keys, used round-robin so API points are spread
+     * across them: {@code PURPLEAIR_API_KEYS}, comma-separated. A secret,
+     * so there is no compiled default — it comes from the environment, the
+     * {@code .env} file or the platform's secret store.
+     *
+     * @throws IllegalStateException if none is set
+     */
     public static List<String> getPurpleAirApiKeys() {
-        return Env.getList("PURPLEAIR_API_KEYS", DEFAULT_PURPLEAIR_API_KEYS);
+        List<String> keys = Env.getList("PURPLEAIR_API_KEYS", List.of());
+        if (keys.isEmpty()) {
+            throw new IllegalStateException(
+                    "PURPLEAIR_API_KEYS must be set: at least one PurpleAir read key, comma-separated");
+        }
+        return keys;
     }
 
     /**
