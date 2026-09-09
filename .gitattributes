@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# a CRLF line continuation breaks a Docker build from the Windows checkout inside WSL
+Dockerfile text eol=lf
+*.sh text eol=lf

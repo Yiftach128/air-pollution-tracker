@@ -1,0 +1,12 @@
+# Only what the build stage needs reaches the Docker daemon: the poms and the sources.
+# .env holds local secrets (Telegram token, Postgres password) and must never enter an image.
+.env*
+.git
+.idea
+**/*.iml
+**/target
+**/logs
+observability
+.github
+data-example.json
+*.md
